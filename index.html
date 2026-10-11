@@ -69,6 +69,8 @@ td.gc.seq{box-shadow:inset 0 0 0 2px #1d3f86;color:#1d3f86;font-weight:700}
 output.ro{display:inline-block;min-width:22px;padding:0 6px;border:1px dashed #9aa5bb;border-radius:4px;background:#eef1f7;font-weight:600;text-align:center}
 #ov .actslot{fill:none;stroke:#1d3f86;stroke-width:3.5;stroke-dasharray:9 4}
 #ov .accedge .vis{stroke:#1d3f86;stroke-width:3.2}
+#stagenote{margin:6px 0 4px;padding:6px 12px;border-radius:6px;background:#1f2a44;color:#fff;border-left:5px solid #ffb400;font-size:13.5px;font-weight:600}
+#stagenote b{color:#ffd166}
 #ov{width:100%;height:auto;display:block;background:#fbfcfe;border:1px solid var(--line);border-radius:8px}
 #ov .node rect{stroke-width:1.5}
 #ov .tile{cursor:pointer}
@@ -186,6 +188,7 @@ table.dt th{width:190px;white-space:nowrap;font-weight:600}table.dt td.note{widt
 <div id="gscroll"></div>
 <div class="note" id="ginfo"></div>
 </div>
+<div id="stagenote" role="status" aria-live="polite" hidden></div>
 <div class="note" id="tileinfo"></div>
 <svg id="ov" viewBox="0 0 1400 660" role="img" aria-label="数据流总览：每条行为箭头起端圆为执行前检查，终端圆为完成后通知"></svg>
 <div class="legend note" style="margin-top:6px">图例：<span style="background:var(--A)"></span>A<span style="background:var(--B)"></span>B<span style="background:var(--SFA)"></span>SFA<span style="background:var(--SFB)"></span>SFB<span style="background:var(--OUT)"></span>输出 BF16<span style="background:var(--TM)"></span>TMEM<span style="background:var(--RG)"></span>寄存器 · 斜纹 = 当前 tile 中越界 / 非有效数据区域 · 查询高亮：<span style="background:var(--qd)"></span>直接相关（实线粗框）<span style="background:var(--qi)"></span>间接相关（虚线框），其余变淡</div>
@@ -1910,6 +1913,11 @@ function renderStatic() {
   $('mb').max = M.R.num_m_blocks - 1; $('nb').max = M.R.num_n_blocks - 1; $('mb').value = S.mb; $('nb').value = S.nb; $('acc').textContent = S.acc; $('out').value = S.out;
   const t = X().t;
   setHTML($('ctasel'), K.kNumMulticast > 1 ? `CTA：<button data-act="cta" data-k="0" ${t.rank === 0 ? 'disabled' : ''}>rank 0（leader）</button> <button data-act="cta" data-k="1" ${t.rank === 1 ? 'disabled' : ''}>rank 1（peer）</button>` : '');
+  // input-pipeline window notice: the overview draws at most 4 stage columns (same window rule as buildSVG)
+  { const St = K.kNumStages, sn = $('stagenote');
+    if (St > 4) { const w0 = Math.floor(S.stage / 4) * 4, w1 = Math.min(St, w0 + 4) - 1, nc = w1 - w0 + 1;
+      sn.hidden = false; sn.innerHTML = `输入流水线共 <b>${St}</b> 个 stage；总览当前显示 stage <b>${w0}–${w1}</b>${nc < 4 ? `（最后一组，仅 ${nc} 列）` : ''}，可通过“输入 stage”选择器查看其他 stage。`; }
+    else { sn.hidden = true; sn.innerHTML = ''; } }
   $('tileinfo').innerHTML = `输出 tile 网格 ${M.R.num_m_blocks}×${M.R.num_n_blocks}（${M.R.num_blocks} 个，BM=${K.BLOCK_M}，BN=${K.BLOCK_N}）· 当前 tile 覆盖 D[${t.m0}..${t.m0 + K.BLOCK_M - 1}, ${t.n0}..${t.n0 + K.BLOCK_N - 1}]，有效 ${t.validM}×${t.validN}${t.validM < K.BLOCK_M || t.validN < K.BLOCK_N ? '（<b>尾块</b>：斜纹为越界区域）' : ''}${K.kNumMulticast > 1 ? ` · 2-CTA：rank = m_block 奇偶（${t.rank}），同 cluster 伙伴 m_block ${t.peerMb}` : ''} · 路径：<b>${M.path}</b>`;
   $('foot').innerHTML = `Claude 独立生成；Codex 做了源码校验、地址/说明修正、主图入口补齐及顺序调整。原始 Claude 输出保存在 tmp/sm100-layout-claude/recovery-answer.html。同步以圆形节点画在行为边两端的修订、以及本次“参数语义依赖查询 + 动态 workload M”修订均由 Claude 生成；get_best_config 为本地 C++ 源码的 JS 移植，并与监督方从原函数抽取的 CPU oracle 对照（M=1..16384 及 int 边界）。源码摘录构建时取自本地仓库（${esc((globalThis.BUILD_INFO || {}).note || '')}）。未在 GPU 上运行。`;
 }
