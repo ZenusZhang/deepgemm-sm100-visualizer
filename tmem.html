@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Claude · DeepGEMM SM100 TMEM Layout D/E/F/G 交互讲解</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{
+  --bg:#f5f6fa;--card:#fff;--ink:#1d2433;--mute:#5d6678;--line:#d9dee8;
+  --sel:#e5243b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.6 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;overflow-x:hidden}
+header{background:linear-gradient(120deg,#1f2a44,#2d4373);color:#fff;padding:18px 28px 14px}
+header h1{margin:0;font-size:22px;letter-spacing:.2px}
+header p{margin:6px 0 0;opacity:.88;font-size:13px}
+nav.toc{position:sticky;top:0;z-index:30;background:#fffffff2;border-bottom:1px solid var(--line);padding:6px 20px;display:flex;gap:6px;flex-wrap:wrap;backdrop-filter:blur(4px)}
+nav.toc a{font-size:12.5px;color:#2d4373;text-decoration:none;padding:2px 8px;border-radius:12px}
+nav.toc a:hover{background:#e8edf8}
+main{max-width:1360px;margin:0 auto;padding:12px 20px 80px}
+section.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px 18px;margin:18px 0;box-shadow:0 1px 3px rgba(20,30,60,.05)}
+section.mma{border:2px solid #2d4373;box-shadow:0 3px 12px rgba(29,45,90,.12)}
+@media (max-width:700px){nav.toc{position:static}main{padding:8px 10px 60px}section.card{padding:12px 12px 14px}header{padding:16px 14px 12px}}
+h2{font-size:18px;margin:0 0 12px;border-left:4px solid #2d4373;padding-left:10px}
+h3{font-size:15px;margin:14px 0 6px}
+p{margin:6px 0}
+a{color:#2457b8}
+code,pre{font-family:Consolas,"SFMono-Regular",Menlo,monospace;font-size:12.5px}
+code{background:#eef1f7;padding:0 4px;border-radius:3px;overflow-wrap:anywhere}
+pre{background:#1e2533;color:#e6edf7;padding:10px 12px;border-radius:8px;overflow:auto;margin:6px 0;line-height:1.5}
+.note{color:var(--mute);font-size:12.5px}
+.warn{background:#fff6e5;border:1px solid #f0d18a;border-radius:8px;padding:8px 12px;font-size:13px;margin:8px 0}
+.info{background:#eef4ff;border:1px solid #bcd0f2;border-radius:8px;padding:8px 12px;font-size:13px;margin:8px 0}
+.notice{background:#fff3e0;border:1px solid #f5b971;border-radius:8px;padding:6px 10px;font-size:13px;margin:6px 0;color:#6a3a00}
+.row{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.col{flex:1 1 360px;min-width:0}
+.pill{display:inline-block;border-radius:12px;padding:1px 9px;font-size:12.5px;background:#eef1f7;margin:2px 2px}
+
+/* 控件 */
+.ctl{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center;padding:10px 12px;background:#f4f6fb;border:1px solid var(--line);border-radius:10px;margin:10px 0}
+.ctl .g{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ctl .lab,.smctl .lab{font-size:12.5px;color:var(--mute)}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid #9aa5bb;border-radius:7px;overflow:hidden}
+.seg button{border:0;border-right:1px solid #c3cad8;border-radius:0;background:#fff;padding:3px 11px;font-size:13px}
+.seg button:last-child{border-right:0}
+.seg button.on{background:#2d4373;color:#fff}
+.seg button:disabled{color:#aab;background:#f1f2f5;cursor:not-allowed}
+.fctl .seg button{padding:5px 12px;min-height:38px;line-height:1.2}
+.fctl .seg button small{display:block;font-size:10.5px;opacity:.8;font-family:Consolas,monospace}
+.fctl .seg button:disabled small{opacity:1;color:#b0263a}
+button{font:inherit;font-size:13px;padding:3px 11px;border:1px solid #9aa5bb;border-radius:7px;background:#fff;cursor:pointer;color:var(--ink)}
+button:hover{background:#eef2fa}
+
+/* 关系表 */
+details.rel{margin:4px 0 10px;border:1px solid var(--line);border-radius:10px;padding:6px 12px;background:#fff}
+details.rel>summary{cursor:pointer;padding:4px 0}
+.relgrid{display:grid;grid-template-columns:minmax(110px,1.3fr) repeat(6,minmax(0,1fr));gap:4px;margin:8px 0;overflow-x:auto}
+.relgrid .rh{font-size:12px;color:var(--mute);text-align:center;font-weight:700}
+.relgrid .rh.span3{grid-column:span 3;border-bottom:2px solid #c3cad8}
+.relgrid .rk{font-size:13px;font-weight:700;display:flex;flex-direction:column;justify-content:center}
+.relgrid .rk small{font-weight:400;font-size:10.5px;color:var(--mute);font-family:Consolas,monospace}
+.relgrid .rc{min-height:46px;padding:2px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px}
+.relgrid .rc b{font-size:18px}
+.relgrid .rc small{font-size:10px;line-height:1.15;color:#7a2530}
+.relgrid .rc.ok small{color:#0f6b4f;font-weight:700}
+.relgrid .rc.bad{background:#f5f5f7;color:#9aa1b0;border-style:dashed;cursor:help}
+.relgrid .rc.LD{background:#dfe9fb}.relgrid .rc.LE{background:#fbe7d4}.relgrid .rc.LF{background:#d9f1e5}.relgrid .rc.LG{background:#ebe1f8}
+.relgrid .rc.on{outline:3px solid var(--sel);outline-offset:-1px}
+@media (max-width:600px){.relgrid{grid-template-columns:repeat(6,minmax(0,1fr))}.relgrid .rk{grid-column:1/-1}.relgrid .rh:first-child,.relgrid>.rh:nth-child(4){display:none}}
+.nkv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13px;margin:4px 0}
+.nsel{display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap;margin:6px 0 8px;padding:8px 10px;background:#f4f6fb;border:1px solid var(--line);border-radius:8px}
+.nsel label{font-size:14px}
+.nsel select{font:inherit;font-size:14px;padding:4px 8px;min-height:34px;border:1px solid #9aa5bb;border-radius:6px;background:#fff}
+.nsel select:focus{outline:3px solid #ffb400;outline-offset:1px}
+.nsel .note{flex:1 1 260px;min-width:0}
+.nkv dt{color:var(--mute);white-space:nowrap}.nkv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+@media (max-width:600px){.nkv{grid-template-columns:1fr}}
+
+/* 指令 → 布局 结果条 */
+.fres{display:grid;grid-template-columns:minmax(0,1.6fr) auto minmax(0,1fr);gap:12px;align-items:center;background:#f7f9fd;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:6px 0}
+.fres .lab{font-size:12px;color:var(--mute)}
+.fres pre{margin:4px 0;font-size:12.5px;white-space:pre-wrap;word-break:break-word}
+.fres-arrow{font-size:32px;color:#2d4373;font-weight:800}
+.fres-r .big{font-size:30px;font-weight:900;color:#2d4373;line-height:1.1}
+@media (max-width:760px){.fres{grid-template-columns:1fr}.fres-arrow{display:none}}
+
+/* 主图 */
+#part-view{margin-top:10px;border:2px solid #2d4373;border-radius:12px;padding:10px 14px;background:#fff}
+#part-view .parth{margin:2px 0 4px;font-size:16px}
+#part-svg{width:100%;height:auto;display:block;background:#fbfcfe;border:1px solid var(--line);border-radius:10px;user-select:none}
+.prompt{background:#eef4ff;border:2px dashed #2457b8;border-radius:8px;padding:8px 12px;font-size:14px;margin:6px 0}
+.partsum{border:2px solid;border-radius:8px;padding:6px 12px;font-size:13.5px;margin:6px 0;font-family:Consolas,"PingFang SC",monospace;overflow-wrap:anywhere}
+svg text{font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+.vt{font-size:15px;font-weight:700;fill:#1f2a44}
+.vs{font-size:12.5px;fill:#4d5668}
+.lbl{font-size:12.5px;fill:#2b3345}
+.flbl{font-size:12px;font-weight:700;fill:#1f2a44;paint-order:stroke;stroke:#fbfcfe;stroke-width:4px;stroke-linejoin:round;pointer-events:none}
+.pbg{fill:#eef0f5;stroke:none}
+.pframe{fill:none;stroke:#1f2a44;stroke-width:1.3;pointer-events:none}
+.ptick{font-size:11.5px;fill:#3d4454}
+.plabel{font-size:12.5px;font-weight:800;fill:#1f2a44;paint-order:stroke;stroke:#fff;stroke-width:3px;pointer-events:none}
+.pmark{font-size:12.5px;font-weight:800;fill:#1f2a44;paint-order:stroke;stroke:#fff;stroke-width:4px;pointer-events:none}
+.ptile,.ppart{cursor:pointer}
+.ptile:hover .pbg{fill:#e3e8f2}
+.ppart:hover rect{filter:brightness(1.05)}
+.tm-unocc{pointer-events:none}
+.pedge{cursor:pointer}
+.pedge .hit{fill:none;stroke:transparent;stroke-width:22}
+.pedge .vis{fill:none;stroke-width:3}
+.pedge.sel .vis{stroke-width:5}
+#part-detail{margin-top:10px;border:2px solid #d9dee8;border-radius:10px;padding:10px 14px;font-size:13.5px;overflow-wrap:anywhere}
+#part-detail h4{margin:2px 0 8px;font-size:15.5px}
+#part-detail .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px}
+#part-detail .kv dt{color:var(--mute);white-space:nowrap}
+#part-detail .kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+#part-detail svg{max-width:100%;height:auto}
+#part-detail .links{margin-top:8px;font-size:12.5px}
+#part-detail .ztitle{font-size:12.5px;font-weight:700;color:#33405a;margin:2px 0}
+@media (max-width:600px){#part-detail .kv{grid-template-columns:1fr}}
+.pdual{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0}
+.pdual>div{flex:1 1 320px;min-width:0;overflow-x:auto}
+table.desc{border-collapse:collapse;font-size:12.5px;width:100%}
+table.desc th,table.desc td{border:1px solid var(--line);padding:3px 6px;text-align:left;vertical-align:top}
+table.desc th{background:#eef1f7}
+table.desc code{overflow-wrap:anywhere}
+
+/* ⑤ 小 M */
+.smctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+#sm-svg{width:100%;height:auto;display:block;background:#fbfcfe;border:1px solid var(--line);border-radius:10px}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.chip{border-radius:10px;padding:6px 12px;border:1px solid var(--line);background:#fff;min-width:130px}
+.chip .v{font-size:20px;font-weight:800;font-family:Consolas,monospace}
+.chip .k{font-size:12px;color:var(--mute)}
+.chip.c1 .v{color:#b0263a}.chip.c2 .v{color:#2f6fd0}.chip.c3 .v{color:#5d6678}.chip.c4 .v{color:#0f6b4f}
+
+</style>
+</head>
+<body>
+<header>
+  <h1>DeepGEMM SM100 · TMEM 结果布局 Layout D / E / F / G</h1>
+  <p>单 CTA · 稠密 · FP32 累加 · A/B 都来自 SMEM（SS）且为 K-major · 依据 PTX ISA 9.4、CUTLASS 与工作区源码。布局表里的 M 是 <b>MMA 指令 M</b>，不是 workload M 或 BLOCK_M。表中所有合法组合按同样方式展示；kind、形式与 M 只在表格中选择。</p>
+</header>
+<nav class="toc" data-testid="toc">
+  <a href="#sec-mma">⓪ 指令 → 布局 → 数据流</a><a href="#sec-smallm">⑤ DeepGEMM 小 M</a>
+</nav>
+<main>
+
+<section class="card mma" id="sec-mma" data-testid="sec-mma">
+  <h2>⓪ 选一条 MMA 指令 → 唯一的结果布局 → 数据怎样流动</h2>
+  <details class="rel" id="rel-wrap" data-testid="rel-wrap" open>
+    <summary><b>完整关系：kind × 形式 × M → Layout</b>（点击格子选择组合；✕ 为非法组合，点击查看原因）</summary>
+    <div id="rel-table" data-testid="rel-table"></div>
+    <div class="nsel" id="nsel-wrap" data-testid="nsel-wrap">
+      <label for="mma-n-select"><b>单条 MMA 的计算 N</b></label>
+      <select id="mma-n-select" data-testid="mma-n-select" aria-describedby="nsel-note"></select>
+      <span class="note" id="nsel-note">本教程的示例取值（64 / 128 / 256），不是硬件合法 N 的全部范围；完整规则见下方。三种 kind 共用这一个 N。</span>
+    </div>
+    <div id="rel-feedback" data-testid="rel-feedback" aria-live="polite"></div>
+    <div id="n-rules" data-testid="n-rules"></div>
+  </details>
+  <div class="ctl fctl" id="flow-ctl">
+    <div class="g" id="g-falign"><span class="lab">F lane alignment</span><span class="seg" id="seg-falign"></span></div>
+  </div>
+  <div id="flow-result" data-testid="flow-result"></div>
+  <div id="flow-notice" class="notice" data-testid="flow-notice"></div>
+  <div id="part-view" data-testid="part-view">
+    <h3 class="parth">主图：选中一个 D 分区 → 一条 MMA 需要的 SMEM A 行、SMEM B 行 → TMEM 中的物理区域</h3>
+    <p class="note">观察单位是 Layout 的一个分区（4×1 / 2×2 / 1×4 中的一格，即一个访问 warp 对应的区域）。图中只画<b>一条 MMA</b> 的 K 片段：A 为 MMA_M×MMA_K、B 为 N×MMA_K（都是 K-major，横轴 K；B 的行轴是原 N）。这是从 BK=128 的真实 SMEM stage 中裁出的观察窗口，不改变底层存储。Tensor Core 为黑盒；本图只到 TMEM。</p>
+    <div class="ctl kctl"><div class="g"><button id="part-clear" data-testid="part-clear">清除分区选择</button></div></div>
+    <div id="part-status" data-testid="part-status" aria-live="polite"></div>
+    <svg id="part-svg" data-testid="part-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    <p class="note" id="part-note" data-testid="part-note"></p>
+    <div id="part-detail" data-testid="part-detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section class="card" id="sec-smallm" data-testid="sec-smallm">
+  <h2>⑤ DeepGEMM 小 M：BLOCK_M 变小，Layout 不变</h2>
+  <p class="note">DeepGEMM 示例：<code>sm100_fp8_fp4_gemm_1d1d.cuh</code> 的<b>非 swap、单 CTA、block-scaled FP8</b> 路径（与 ⓪ 的选择无关），演示 workload M 对应的 BLOCK_M（本页固定示例，<b>不是</b>重新执行完整 <code>get_best_config</code>）。该源码中 <code>LAYOUT_AD_M=128</code> → <code>UMMA_M</code> 恒为 128 → 结果布局恒为 Layout D（<a href="./deep_gemm/include/deep_gemm/impls/sm100_fp8_fp4_gemm_1d1d.cuh">sm100_fp8_fp4_gemm_1d1d.cuh:49–50</a>）；BLOCK_M=32/64 只改变取出几个 32 行区间。</p>
+  <div class="smctl"><span class="lab">workload M</span><span class="seg" id="seg-sm" data-testid="smallm-seg"></span></div>
+  <div class="chips" id="sm-chips" data-testid="smallm-chips"></div>
+  <svg id="sm-svg" data-testid="smallm-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div class="row">
+    <div class="col"><div class="warn"><b>SMEM A stage 并没有一律扩到 128 行。</b><code>SMEM_A_SIZE_PER_STAGE = LOAD_BLOCK_M×BLOCK_K×sizeof(A)</code>，BM=32 时就是 32 行（kernel:93）。<code>UMMA_A_SIZE_PER_STAGE = align(LOAD_BLOCK_M,128)×…</code> 只是校验 MMA 读取范围不越界的量（kernel:100），多读的行可能落在后续已分配的 A/B 缓冲（指针排布 kernel:139）。M=4 时 A tile 内 4…31 行是 TMA 越界填充，32…127 行不能认定为同一块显式补零。（行号均指 <a href="./deep_gemm/include/deep_gemm/impls/sm100_fp8_fp4_gemm_1d1d.cuh">sm100_fp8_fp4_gemm_1d1d.cuh</a>）</div></div>
+    <div class="col"><div class="info">只读取 Layout D 的第一个 32 行区间<b>并不等于 Layout G</b>。四个分区也不意味着必须启用四个写回 warp：<code>kNumUMMAStoreThreads = min(BM,128)</code>，BM=32 只启用 1 个（kernel:86、479）。写回 warp 用 <code>tcgen05.ld.sync.aligned.32x32b.x8</code> 读回，线程 t 读 lane 32W+t（<a href="./deep_gemm/include/deep_gemm/epilogue/sm100_store_cd.cuh">sm100_store_cd.cuh:120</a>）。额外 MMA 行的比例（如 96/128）<b>不能直接当作时间或能耗损失比例</b>。完整 kernel 中结果列还要加上 <code>accum_stage_idx×UMMA_N</code> 的累加槽偏移（kernel:506）。</div></div>
+  </div>
+</section>
+</main>
+<script>
+/*
+ * LayoutModel —— 纯数据映射（无 DOM）。浏览器中挂到 window.LayoutModel，node 中 module.exports。
+ *
+ * 物理坐标范围：FP32 累加器、单条 MMA 的单个结果 atom、基址 lane=0/column=0。
+ * column 指结果占用的 TMEM 列（相对基址），不是 tcgen05.alloc 的分配粒度；
+ * (lane,column) 也不是 tcgen05.ld 操作数里的编码地址——执行 ld 的 warp 会隐式选择 lane 组。
+ *
+ * Primary source：third-party/cutlass/include/cute/atom/mma_traits_sm100.hpp
+ *   以 virtual 地址 v = lane + 128*column（DP_STRIDE=1, COL_STRIDE=128）定义 atom，再 restride：
+ *   lane = v % 128，column = floor(v / 128)。
+ *   D  tmem_frg  M=128      : Shape<_128,N>,                Stride<_1,_128>          (L521-522)
+ *   F  tmem_frg  M=64       : Shape<Shape<_16,_4>,N>,       Stride<Stride<_1,_32>,_128> (L507-508)
+ *   E  tmem_frg_ws M=64     : Shape<_64,Shape<N/2,_2>>,     Stride<_1,Stride<_128,_64>> (L935-936)
+ *   G  tmem_frg_ws M=32     : Shape<_32,Shape<N/4,_4>>,     Stride<_1,Stride<_128,_32>> (L922-923)
+ *   F 的 lane alignment 0/16 来自 PTX F 地址图（0x0000|0x0010 …）。
+ */
+(function (root) {
+  'use strict';
+
+  var CUTE = 'third-party/cutlass/include/cute/atom/mma_traits_sm100.hpp';
+  var LAYOUTS = {
+    D: {
+      id: 'D', mmaM: 128, ws: false, notation: '4x1', groupsM: 4, groupsN: 1,
+      rowsPerRegion: 32, datapathPerGroup: 32, half: false,
+      condition: 'MMA M=128，cta_group::1，.ws / 非 .ws 均可',
+      usedByKernel: true,
+      summary: '四个沿 M 排列的 32 行区域，每块 32 行 × 全部 N',
+      formula: 'lane = m，column = n',
+      source: { file: CUTE, lines: [517, 524], excerpt: 'src-cute-d', label: 'mma_traits_sm100.hpp:517–524（tmem_frg，M_MMA=128）' }
+    },
+    E: {
+      id: 'E', mmaM: 64, ws: true, notation: '2x2', groupsM: 2, groupsN: 2,
+      rowsPerRegion: 32, datapathPerGroup: 32, half: false,
+      condition: 'MMA M=64，.ws（weight-stationary）',
+      usedByKernel: false,
+      summary: '沿 M 两组、沿 N 两组：上排 W0/W2，下排 W1/W3，每块 32 行 × N/2',
+      formula: 'lane = m + 64·⌊n / (N/2)⌋，column = n mod (N/2)',
+      source: { file: CUTE, lines: [932, 937], excerpt: 'src-cute-e', label: 'mma_traits_sm100.hpp:932–937（tmem_frg_ws，M_MMA=64）' }
+    },
+    F: {
+      id: 'F', mmaM: 64, ws: false, notation: '4x1', groupsM: 4, groupsN: 1,
+      rowsPerRegion: 16, datapathPerGroup: 16, half: true,
+      condition: 'MMA M=64，非 .ws（每组只用 16 条 datapath，lane alignment 0/16）',
+      usedByKernel: false,
+      summary: '仍沿 M 分四组，但每组只有 16 行；每个 32-lane 组仅 16 条 lane 有效',
+      formula: 'lane = 32·⌊m / 16⌋ + (m mod 16) + alignment，column = n',
+      source: { file: CUTE, lines: [504, 508], excerpt: 'src-cute-f', label: 'mma_traits_sm100.hpp:504–508（tmem_frg，M_MMA=64）' }
+    },
+    G: {
+      id: 'G', mmaM: 32, ws: true, notation: '1x4', groupsM: 1, groupsN: 4,
+      rowsPerRegion: 32, datapathPerGroup: 32, half: false,
+      condition: 'MMA M=32，.ws（weight-stationary）',
+      usedByKernel: false,
+      summary: '沿 N 分四组，每块覆盖全部 32 行 × N/4',
+      formula: 'lane = m + 32·⌊n / (N/4)⌋，column = n mod (N/4)',
+      source: { file: CUTE, lines: [919, 924], excerpt: 'src-cute-g', label: 'mma_traits_sm100.hpp:919–924（tmem_frg_ws，M_MMA=32）' }
+    }
+  };
+  var IDS = ['D', 'E', 'F', 'G'];
+  var N_PRESETS = [64, 128, 256];
+  // 官方地址图中 tcgen05.ld/st 地址的 lane 字段（高 16 位），按 warp_rank%4 给出；它不等于物理 lane
+  var ENCODED_LANE_FIELD = {
+    D: function (w) { return 32 * w; },               // 0x0000/0x0020/0x0040/0x0060
+    E: function (w) { return (w % 2) * 32; },         // 上排 W0/W2 = 0x0000，下排 W1/W3 = 0x0020
+    F: function (w, a) { return 32 * w + a; },        // 0x0000|0x0010, 0x0020|0x0030, ...
+    G: function () { return 0; }                      // 全部 0x0000
+  };
+
+  var STORE = {
+    // 当前 kernel 非 swap、BF16 输出：kNumElemsPerBankGroup=16/sizeof(bf16)=8，
+    // 假设 kSwizzleCDMode=128 → STORE_BLOCK_N=128/2=64
+    instr: 'tcgen05.ld.sync.aligned.32x32b.x8.b32',
+    cuteName: 'SM100_TMEM_LOAD_32dp32b8x',
+    elemsPerLoad: 8,
+    storeBlockN: 64,
+    numNonEpilogueThreads: 128
+  };
+
+  function isInt(x) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x; }
+  function fail(msg) { return { ok: false, error: msg }; }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  function checkLayout(layout) {
+    if (typeof layout !== 'string' || !LAYOUTS[layout.toUpperCase()]) return null;
+    return LAYOUTS[layout.toUpperCase()];
+  }
+  // 教学范围：四种布局统一只接受 N=64/128/256。E/G（.ws）的 N 本来就只能取这三个值
+  // （mma_traits_sm100.hpp:916 static_assert）；D/F 指令允许更多 N，但本页只演示这三个预设。
+  function checkN(L, N) {
+    if (!isInt(N)) return 'N 必须是整数';
+    if (N_PRESETS.indexOf(N) < 0) {
+      return L.ws ? 'Layout ' + L.id + '（.ws）的 N 只能是 64/128/256（cute static_assert，mma_traits_sm100.hpp:916）'
+        : '本页教学 API 只接受 N=64/128/256（Layout ' + L.id + ' 指令本身允许更多 N，但不在本页演示范围）';
+    }
+    return null;
+  }
+  function normAlign(L, alignment) {
+    if (alignment === undefined || alignment === null) alignment = 0;
+    if (!isInt(alignment)) return { error: 'alignment 必须是整数 0 或 16' };
+    if (L.id === 'F') {
+      if (alignment !== 0 && alignment !== 16) return { error: 'Layout F 的 lane alignment 只能是 0 或 16' };
+    } else if (alignment !== 0) {
+      return { error: 'alignment 只对 Layout F 有意义；Layout ' + L.id + ' 请传 0 或省略' };
+    }
+    return { value: alignment };
+  }
+  function prelude(layout, N, alignment) {
+    var L = checkLayout(layout);
+    if (!L) return { error: '未知布局 ' + layout + '（只支持 D/E/F/G）' };
+    var e = checkN(L, N); if (e) return { error: e };
+    var a = normAlign(L, alignment); if (a.error) return { error: a.error };
+    return { L: L, align: a.value };
+  }
+
+  /** 结果在 TMEM 中占用的列数（相对基址；不是 tcgen05.alloc 粒度） */
+  function columnSpanOf(id, N) { return id === 'E' ? N / 2 : id === 'G' ? N / 4 : N; }
+  /** tcgen05.alloc 的列数要求：2 的幂且 ≥32（与 utils.cuh:68 的 helper 一致） */
+  function allocColumnsFor(span) { var c = 32; while (c < span) c *= 2; return c; }
+
+  /* ---- 正向公式（来自 cute atom 推导） ---- */
+  function physOf(id, m, n, N, al) {
+    if (id === 'D') return { lane: m, column: n };
+    if (id === 'F') return { lane: 32 * Math.floor(m / 16) + (m % 16) + al, column: n };
+    if (id === 'E') { var h = N / 2; return { lane: m + 64 * Math.floor(n / h), column: n % h }; }
+    var q = N / 4; return { lane: m + 32 * Math.floor(n / q), column: n % q };
+  }
+
+  function getLayout(id) {
+    var L = checkLayout(id); if (!L) return null;
+    var c = clone(L); c.nPresets = N_PRESETS.slice(); return c;
+  }
+  function listLayouts() { return IDS.map(getLayout); }
+
+  /** 每个 warp_rank%4 对应的逻辑区域与物理 TMEM 区域 */
+  function regions(layout, N, alignment) {
+    var p = prelude(layout, N, alignment); if (p.error) return fail(p.error);
+    var L = p.L, al = p.align, out = [], span = columnSpanOf(L.id, N);
+    for (var w = 0; w < 4; w++) {
+      var gm, gn;
+      if (L.id === 'E') { gm = w % 2; gn = Math.floor(w / 2); }
+      else if (L.id === 'G') { gm = 0; gn = w; }
+      else { gm = w; gn = 0; }
+      var cols = N / L.groupsN, rows = L.rowsPerRegion;
+      var m0 = gm * rows, n0 = gn * cols;
+      var p0 = physOf(L.id, m0, n0, N, al);
+      out.push({
+        warp: w,
+        mRange: [m0, m0 + rows - 1],
+        nRange: [n0, n0 + cols - 1],
+        shape: [rows, cols],
+        laneGroup: [32 * w, 32 * w + 31],
+        activeLanes: [p0.lane, p0.lane + rows - 1],
+        unusedLanes: L.id === 'F' ? (al === 0 ? [32 * w + 16, 32 * w + 31] : [32 * w, 32 * w + 15]) : null,
+        physColumns: [p0.column, p0.column + cols - 1],
+        encodedLaneField: ENCODED_LANE_FIELD[L.id](w, al)
+      });
+    }
+    return {
+      ok: true, layout: L.id, N: N, alignment: al, mmaM: L.mmaM, notation: L.notation,
+      columnSpan: span, allocColumns: allocColumnsFor(span), regions: out
+    };
+  }
+
+  /**
+   * mapElement(layout, m, n, N, alignment) → 逻辑元素 D[m,n] 的完整映射。
+   * 失败返回 {ok:false,error}，永不抛异常。
+   */
+  function mapElement(layout, m, n, N, alignment) {
+    var p = prelude(layout, N, alignment); if (p.error) return fail(p.error);
+    var L = p.L, al = p.align;
+    if (!isInt(m) || !isInt(n)) return fail('m、n 必须是整数');
+    if (m < 0 || m >= L.mmaM) return fail('Layout ' + L.id + ' 的 MMA M=' + L.mmaM + '，m 需在 0..' + (L.mmaM - 1));
+    if (n < 0 || n >= N) return fail('n 需在 0..' + (N - 1));
+    var R = regions(L.id, N, al).regions, reg = null;
+    for (var i = 0; i < 4; i++) {
+      var r = R[i];
+      if (m >= r.mRange[0] && m <= r.mRange[1] && n >= r.nRange[0] && n <= r.nRange[1]) { reg = r; break; }
+    }
+    var ph = physOf(L.id, m, n, N, al), w = reg.warp;
+    var span = columnSpanOf(L.id, N);
+    var tm = {
+      lane: ph.lane, column: ph.column,
+      warpFromLane: Math.floor(ph.lane / 32),
+      formula: L.formula,
+      scope: 'FP32、单个结果 atom、基址 lane 0 / column 0',
+      columnSpan: span, allocColumns: allocColumnsFor(span),
+      evidence: L.id === 'F' ? 'cutlass+ptx-figure' : L.id === 'D' ? 'cutlass+kernel' : 'cutlass',
+      source: clone(L.source),
+      laneGroup: reg.laneGroup.slice(),
+      activeLanes: reg.activeLanes.slice(),
+      encodedLaneField: reg.encodedLaneField,
+      encodedLaneFieldHex: '0x' + ('0000' + reg.encodedLaneField.toString(16).toUpperCase()).slice(-4) + '.0XXX',
+      note: '物理 (lane, column) 不是 tcgen05.ld 操作数里的编码地址：ld 的访问 warp 隐式选择 lane 组（kernel:486 注释：硬件忽略地址中的 warp 位）'
+    };
+
+    var register = null;
+    if (L.id === 'D') {
+      var s = Math.floor(n / STORE.storeBlockN), within = n % STORE.storeBlockN;
+      var ii = Math.floor(within / STORE.elemsPerLoad), j = n % STORE.elemsPerLoad;
+      register = {
+        scope: 'DeepGEMM 示例（sm100_store_cd.cuh）：非 swap、单 CTA、BF16 输出写回路径（假设 kSwizzleCDMode=128，STORE_BLOCK_N=64）',
+        instr: STORE.instr, cuteName: STORE.cuteName,
+        ctaWarp: STORE.numNonEpilogueThreads / 32 + w,
+        epilogueWarpIdx: w,
+        threadLane: m % 32,
+        store: s, chunk: ii, regIndex: j,
+        loadColumns: [n - j, n - j + 7],
+        requiresBlockM: m < 32 ? 32 : (m < 64 ? 64 : 128),
+        kernelColumn: 'accum_stage_idx × UMMA_N + ' + n,
+        note: '线程 t=' + (m % 32) + ' 在这条 x8 load 中取 lane ' + m + ' 的 8 个连续 FP32 列，values[' + j + '] 即本元素；' +
+          '这一线程↔lane 对应仅在 32x32b 形状下成立'
+      };
+    }
+    return {
+      ok: true, layout: L.id, m: m, n: n, N: N, alignment: al,
+      mmaM: L.mmaM, notation: L.notation, ws: L.ws, usedByKernel: L.usedByKernel,
+      warp: w, warpRankMod4: w,
+      region: { mRange: reg.mRange.slice(), nRange: reg.nRange.slice(), shape: reg.shape.slice() },
+      local: { row: m - reg.mRange[0], col: n - reg.nRange[0] },
+      localNote: '区域内坐标只是逻辑偏移，不是线程 lane 或寄存器编号',
+      tmem: tm,
+      register: register
+    };
+  }
+
+  /**
+   * unmapElement(layout, lane, column, N, alignment) → 物理 TMEM 坐标反查逻辑元素。
+   * 有效时返回 mapElement 的完整记录（ok:true, m, n, …）；
+   * F 的未使用半区、超出结果占用列、越界等返回 {ok:false,error}。
+   */
+  function unmapElement(layout, lane, column, N, alignment) {
+    var p = prelude(layout, N, alignment); if (p.error) return fail(p.error);
+    var L = p.L, al = p.align;
+    if (!isInt(lane) || !isInt(column)) return fail('lane、column 必须是整数');
+    if (lane < 0 || lane > 127) return fail('lane 需在 0..127');
+    var span = columnSpanOf(L.id, N);
+    if (column < 0 || column >= span) return fail('Layout ' + L.id + '、N=' + N + ' 的结果只占用列 0..' + (span - 1) + '（相对基址），column ' + column + ' 不含该结果数据');
+    var m, n;
+    if (L.id === 'D') { m = lane; n = column; }
+    else if (L.id === 'F') {
+      var r = lane % 32 - al;
+      if (r < 0 || r >= 16) return fail('lane ' + lane + ' 属于 Layout F（alignment ' + al + '）的未使用半区，不含结果数据');
+      m = 16 * Math.floor(lane / 32) + r; n = column;
+    } else if (L.id === 'E') { m = lane % 64; n = column + Math.floor(lane / 64) * (N / 2); }
+    else { m = lane % 32; n = column + Math.floor(lane / 32) * (N / 4); }
+    var rec = mapElement(L.id, m, n, N, al);
+    if (rec.ok && (rec.tmem.lane !== lane || rec.tmem.column !== column)) return fail('内部不一致：反查结果未回到原坐标');
+    return rec;
+  }
+
+  /** 同一元素在四种布局中的对照（F 使用给定 alignment） */
+  function compareElement(m, n, N, alignment) {
+    var res = {};
+    IDS.forEach(function (id) { res[id] = mapElement(id, m, n, N, id === 'F' ? (alignment || 0) : 0); });
+    return res;
+  }
+
+  var SMALL_M = { 4: 32, 32: 32, 64: 64, 128: 128 };
+  /**
+   * smallM(workloadM)：固定当前非 swap、单 CTA 路径的演示（只接受 4/32/64/128）。
+   * BLOCK_M 取值是本演示的固定对照，不代表重新执行完整 get_best_config。
+   */
+  function smallM(workloadM) {
+    if (!isInt(workloadM) || !SMALL_M[workloadM]) return fail('演示只支持 workload M = 4/32/64/128');
+    var bm = SMALL_M[workloadM], warps = bm / 32, ranks = [], cta = [];
+    for (var i = 0; i < warps; i++) { ranks.push(i); cta.push(4 + i); }
+    return {
+      ok: true, workloadM: workloadM, blockM: bm,
+      ummaM: 128, layout: 'D', notation: '4x1',
+      validRows: Math.min(workloadM, bm),
+      extractedRows: bm,
+      mmaRows: 128,
+      nonWrittenMmaRows: 128 - bm,
+      storeThreads: bm,
+      writebackWarps: warps,
+      warpRanksMod4: ranks,
+      ctaWarps: cta,
+      smemAStageRows: bm,
+      ummaAReadRows: 128,
+      tmaOOBRows: bm - Math.min(workloadM, bm),
+      instr: STORE.instr,
+      note: 'UMMA_M 固定 128 → Layout D；BLOCK_M 只决定取出几个 32 行区间（kNumUMMAStoreThreads=STORE_BLOCK_M=min(BM,128)）'
+    };
+  }
+
+  var api = {
+    version: '2.0',
+    LAYOUT_IDS: IDS.slice(),
+    N_PRESETS: N_PRESETS.slice(),
+    SMALL_M_CASES: [4, 32, 64, 128],
+    getLayout: getLayout,
+    listLayouts: listLayouts,
+    regions: regions,
+    mapElement: mapElement,
+    unmapElement: unmapElement,
+    compareElement: compareElement,
+    columnSpan: function (layout, N) { var p = prelude(layout, N, 0); return p.error ? fail(p.error) : { ok: true, columnSpan: columnSpanOf(p.L.id, N), allocColumns: allocColumnsFor(columnSpanOf(p.L.id, N)) }; },
+    smallM: smallM,
+    STORE: clone(STORE)
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.LayoutModel = api;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/*
+ * MmaFlowModel —— “指令合法组合 → 结果 layout → 数据流” 的纯数据模型（无 DOM）。
+ * 浏览器中挂到 window.MmaFlowModel，node 中 module.exports。
+ *
+ * 范围：SM100（sm_100a/f）、单 CTA（cta_group::1）、稠密（Dense）、FP32 累加。
+ * 依据：
+ *   PTX ISA 9.4 Table 48（tcgen05 matrix shape）、Data Path Layout Organization 表、
+ *   tcgen05.mma / tcgen05.mma.ws / tcgen05.cp / tcgen05.ld 语法；
+ *   CUTLASS cute/arch/mma_sm100_umma.hpp 封装的 static_assert；
+ *   DeepGEMM sm100_fp8_fp4_gemm_1d1d.cuh 的实际路径。
+ * K=64（f8f6f4/mxf8f6f4 dense）只在 sm_107f 及以上，不属于 SM100，本模型不收录。
+ */
+(function (root) {
+  'use strict';
+
+  var KINDS = {
+    f8f6f4: {
+      id: 'f8f6f4', label: '普通 FP8', ptxKind: '.kind::f8f6f4', blockScale: false,
+      abType: 'E4M3/E5M2（FP8）', abBytes: 1, K: 32, wsAllowed: true, nonWsM: [64, 128], wsM: [32, 64, 128],
+      cutlassSS: 'SM100_MMA_F8F6F4_SS：arch 结构体（mma_sm100_umma.hpp:954）本身无断言，但 MMA_Traits 有（mma_traits_sm100.hpp:2641–2645）：M∈{64,128}；B 为 K-major 时 N%8、8≤N≤256，B 为 MN-major 时 N%16、16≤N≤256（本页 A/B 均为 K-major）',
+      cutlassTS: 'SM100_MMA_F8F6F4_TS（mma_sm100_umma.hpp:1032–1039）：M=64 要求 N%8、8≤N≤256；M=128 要求 N%16、16≤N≤256；A 必须 K-major',
+      cutlassSSRule: function (m, n) { return (m === 64 || m === 128) && n % 8 === 0 && n >= 8 && n <= 256; },
+      cutlassTSRule: function (m, n) { return m === 64 ? n % 8 === 0 && n >= 8 && n <= 256 : m === 128 ? n % 16 === 0 && n >= 16 && n <= 256 : false; }
+    },
+    mxf8f6f4: {
+      id: 'mxf8f6f4', label: 'FP8 block scale（MXFP8）', ptxKind: '.kind::mxf8f6f4.block_scale', blockScale: true,
+      abType: 'E4M3/E5M2（FP8）+ UE8M0 scale', abBytes: 1, K: 32, wsAllowed: false, nonWsM: [128], wsM: [],
+      cutlassSS: 'SM100_MMA_MXF8F6F4_SS（mma_sm100_umma.hpp:990–993）：M==128；N%8、8≤N≤256',
+      cutlassTS: '本 checkout 的 mma_sm100_umma.hpp 中没有 MXF8F6F4 的 TS 封装（只有 SS / 2x1SM / SPARSE）；缺封装不等于硬件不支持，TS 依据 PTX 语法 [a-tmem]',
+      cutlassSSRule: function (m, n) { return m === 128 && n % 8 === 0 && n >= 8 && n <= 256; },
+      cutlassTSRule: null
+    },
+    f16: {
+      id: 'f16', label: 'BF16（对照）', ptxKind: '.kind::f16', blockScale: false,
+      abType: 'BF16', abBytes: 2, K: 16, wsAllowed: true, nonWsM: [64, 128], wsM: [32, 64, 128],
+      cutlassSS: 'SM100_MMA_F16BF16_SS（mma_sm100_umma.hpp:86–90）：M∈{64,128}；N%8、8≤N≤256',
+      cutlassTS: 'SM100_MMA_F16BF16_TS（mma_sm100_umma.hpp:171–178）：M=64 要求 N%8；M=128 要求 N%16、16≤N≤256；A 必须 K-major',
+      cutlassSSRule: function (m, n) { return (m === 64 || m === 128) && n % 8 === 0 && n >= 8 && n <= 256; },
+      cutlassTSRule: function (m, n) { return m === 64 ? n % 8 === 0 && n >= 8 && n <= 256 : m === 128 ? n % 16 === 0 && n >= 16 && n <= 256 : false; }
+    }
+  };
+  var KIND_IDS = ['f8f6f4', 'mxf8f6f4', 'f16'];
+  var M_VALUES = [32, 64, 128];
+  var N_DEMO = [64, 128, 256];
+  var LAYOUT_OF = { 'nows-64': 'F', 'nows-128': 'D', 'ws-32': 'G', 'ws-64': 'E', 'ws-128': 'D' };
+  var NOTATION = { D: '4×1', E: '2×2', F: '4×1（半数 datapath）', G: '1×4' };
+  var DEFAULT = { kind: 'mxf8f6f4', ws: false, m: 128, aSrc: 'smem', aPrep: 'st', enableInputD: true };
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function fail(msg, extra) { var r = { ok: false, error: msg }; if (extra) for (var k in extra) r[k] = extra[k]; return r; }
+  // 官方 PTX 9.4 深链（只在点击时打开，页面运行不加载网络）
+  var PTX = 'https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#';
+  var REF = {
+    pipeSame: ['9.7.18.6.4.1 Pipelined instructions, same thread', 'tcgen05-memory-consistency-model-canonical-sync-patterns-pipelined-same-thread'],
+    nonPipeSame: ['9.7.18.6.4.2 Non-pipelined, same thread', 'tcgen05-memory-consistency-model-canonical-sync-patterns-non-pipelined-same-thread'],
+    pipeDiff: ['9.7.18.6.4.3 Pipelined, different threads in same warp', 'tcgen05-memory-consistency-model-canonical-sync-patterns-pipelined-diff-thread'],
+    nonPipeDiff: ['9.7.18.6.4.4 Non-pipelined, different thread', 'tcgen05-memory-consistency-model-canonical-sync-patterns-non-pipelined-diff-thread'],
+    regDep: ['9.7.18.6.4.5 Register dependencies, same thread', 'tcgen05-memory-consistency-model-canonical-sync-patterns-reg-dependency-same-thread'],
+    pipelined: ['9.7.18.6.2 Pipelined tcgen05 instructions', 'tcgen05-memory-consistency-model-pipelined-instructions'],
+    asyncOps: ['9.7.18.6.1 Asynchronous operations', 'tcgen05-memory-consistency-model-async-operations'],
+    fence: ['tcgen05.fence', 'tcgen05-special-sync-operations-fence'],
+    wait: ['tcgen05.wait', 'tcgen05-instructions-tcgen05-wait'],
+    st: ['tcgen05.st', 'tcgen05-instructions-tcgen05-st'],
+    cp: ['tcgen05.cp', 'tcgen05-instructions-tcgen05-cp'],
+    ld: ['tcgen05.ld', 'tcgen05-instructions-tcgen05-ld'],
+    mma: ['tcgen05.mma', 'tcgen05-mma-instructions-mma'],
+    mmaWs: ['tcgen05.mma.ws', 'tcgen05-mma-instructions-mma-ws'],
+    shape: ['Table 48 matrix shape', 'tcgen05-matrix-shape'],
+    blockScale: ['Block scaling', 'tcgen05-block-scaling']
+  };
+  function refs(keys) { return keys.map(function (k) { return { label: REF[k][0], url: PTX + REF[k][1] }; }); }
+
+  /** 规范化并校验配置（只校验字段取值，不判断组合是否合法） */
+  function normalize(cfg) {
+    cfg = cfg || {};
+    var c = {
+      kind: cfg.kind === undefined ? DEFAULT.kind : cfg.kind,
+      ws: cfg.ws === undefined ? DEFAULT.ws : cfg.ws,
+      m: cfg.m === undefined ? DEFAULT.m : cfg.m,
+      aSrc: cfg.aSrc === undefined ? DEFAULT.aSrc : cfg.aSrc,
+      aPrep: cfg.aPrep === undefined ? DEFAULT.aPrep : cfg.aPrep,
+      enableInputD: cfg.enableInputD === undefined ? DEFAULT.enableInputD : cfg.enableInputD
+    };
+    if (!KINDS[c.kind]) return { error: '未知 kind：' + c.kind + '（只支持 f8f6f4 / mxf8f6f4 / f16）' };
+    if (typeof c.ws !== 'boolean') return { error: 'ws 必须是布尔值' };
+    if (M_VALUES.indexOf(c.m) < 0) return { error: 'M 只能是 32 / 64 / 128（单 CTA）' };
+    if (c.aSrc !== 'smem' && c.aSrc !== 'tmem') return { error: 'aSrc 只能是 smem（SS）或 tmem（TS）' };
+    if (c.aPrep !== 'st' && c.aPrep !== 'cp') return { error: 'aPrep 只能是 st 或 cp' };
+    if (typeof c.enableInputD !== 'boolean') return { error: 'enableInputD 必须是布尔值' };
+    return { cfg: c };
+  }
+
+  /** 组合合法性：返回 {ok, layout, reason} */
+  function legality(kind, ws, m) {
+    var K = KINDS[kind];
+    if (!K) return { ok: false, layout: null, reason: '未知 kind' };
+    if (ws && !K.wsAllowed) return { ok: false, layout: null, reason: 'PTX Table 48：' + K.ptxKind + ' 的 .ws 一栏为 Invalid（block scale 没有 weight-stationary 形式）' };
+    var list = ws ? K.wsM : K.nonWsM;
+    if (list.indexOf(m) < 0) {
+      var why = K.blockScale ? 'PTX Table 48：.kind::mxf8f6f4 单 CTA 稠密只有 128xNxK'
+        : (!ws && m === 32 ? 'PTX Table 48：非 .ws、cta_group::1 只支持 64xNxK / 128xNxK；M=32 只存在于 .ws' : '该 M 不在 PTX Table 48 中');
+      return { ok: false, layout: null, reason: why };
+    }
+    return { ok: true, layout: LAYOUT_OF[(ws ? 'ws-' : 'nows-') + m], reason: null };
+  }
+
+  /** N 的合法规则：ISA 表 / CUTLASS 封装 / 当前 kernel 三个层级分开给出 */
+  function nRule(kind, ws, m, aSrc) {
+    var K = KINDS[kind];
+    if (!K) return null;
+    var isaText, isaFn;
+    if (ws) { isaText = 'N ∈ {64, 128, 256}（PTX Table 48，.ws 稠密）'; isaFn = function (n) { return n === 64 || n === 128 || n === 256; }; }
+    else { isaText = 'N = 8, 16, 24, … 256（步长 8；PTX Table 48，cta_group::1 稠密，K=' + K.K + '）'; isaFn = function (n) { return n % 8 === 0 && n >= 8 && n <= 256; }; }
+    var cut, cutFn = null;
+    if (ws) cut = '本 checkout 的 cute/arch/mma_sm100_umma.hpp 没有 .ws 的 MMA 封装（缺封装不等于硬件不支持）；traits 的 tmem_frg_ws 断言 N∈{64,128,256}（mma_traits_sm100.hpp:916）';
+    else if (aSrc === 'tmem') { cut = K.cutlassTS; cutFn = K.cutlassTSRule; }
+    else { cut = K.cutlassSS; cutFn = K.cutlassSSRule; }
+    var isKernel = kind === 'mxf8f6f4' && !ws && m === 128 && aSrc === 'smem';
+    return {
+      isa: isaText, cutlass: cut,
+      kernel: isKernel ? 'DeepGEMM sm100_fp8_fp4_gemm_1d1d.cuh:308–311：UMMA_M=128 时要求 N%16、16≤N≤256（比 ISA 更严格）' : null,
+      demo: '本页图形只演示 N = 64 / 128 / 256（已核实的子集，不代表只有这三个值合法）',
+      check: function (n) {
+        return { isa: isaFn(n), cutlass: cutFn ? cutFn(m, n) : null, kernel: isKernel ? (n % 16 === 0 && n >= 16 && n <= 256) : null };
+      }
+    };
+  }
+  function checkN(cfg, n) {
+    var nz = normalize(cfg); if (nz.error) return fail(nz.error);
+    var c = nz.cfg, L = legality(c.kind, c.ws, c.m);
+    if (!L.ok) return fail(L.reason);
+    if (typeof n !== 'number' || Math.floor(n) !== n) return fail('N 必须是整数');
+    var r = nRule(c.kind, c.ws, c.m, c.aSrc).check(n);
+    return { ok: true, n: n, isa: r.isa, cutlass: r.cutlass, kernel: r.kernel };
+  }
+
+  function instrTemplate(c) {
+    var K = KINDS[c.kind], a = c.aSrc === 'tmem' ? '[a-tmem]' : 'a-desc';
+    if (K.blockScale) return 'tcgen05.mma.cta_group::1.kind::mxf8f6f4.block_scale{.scale_vec::1X | .block32}\n    [d-tmem], ' + a + ', b-desc, idesc,\n    [scale-A-tmem], [scale-B-tmem], enable-input-d;';
+    if (c.ws) return 'tcgen05.mma.ws.cta_group::1' + K.ptxKind + '{.collector::bN::op}\n    [d-tmem], ' + a + ', b-desc, idesc,\n    enable-input-d {, zero-column-mask-desc};';
+    return 'tcgen05.mma.cta_group::1' + K.ptxKind + '\n    [d-tmem], ' + a + ', b-desc, idesc,\n    { disable-output-lane }, enable-input-d' + (c.kind === 'f16' ? ' {, scale-input-d}' : '') + ';';
+  }
+
+  /** resolve(cfg) → 合法组合的完整信息；非法时 {ok:false,error,reason} */
+  function resolve(cfg) {
+    var nz = normalize(cfg); if (nz.error) return fail(nz.error);
+    var c = nz.cfg, K = KINDS[c.kind], L = legality(c.kind, c.ws, c.m);
+    if (!L.ok) return fail('非法组合：' + L.reason, { reason: L.reason, cfg: c });
+    var isKernel = c.kind === 'mxf8f6f4' && !c.ws && c.m === 128 && c.aSrc === 'smem';
+    return {
+      ok: true, cfg: c, layout: L.layout, notation: NOTATION[L.layout],
+      kind: { id: K.id, label: K.label, ptxKind: K.ptxKind, abType: K.abType, abBytes: K.abBytes, blockScale: K.blockScale },
+      K: K.K,
+      shape: c.m + '×N×' + K.K,
+      instr: instrTemplate(c),
+      kernelInstr: isKernel ? 'tcgen05.mma.cta_group::1.kind::mxf8f6f4.block_scale [%0], %1, %2, %3, [%5], [%6], p;' : null,
+      isCurrentKernel: isKernel,
+      status: 'PTX ISA 合法组合（单 CTA、稠密，' + (c.aSrc === 'tmem' ? 'TS：A 来自 TMEM' : 'SS：A、B 来自 SMEM') + '）',
+      aSrcNote: c.aSrc === 'tmem'
+        ? 'A 从 TMEM 读取（[a-tmem]）；B 始终来自 SMEM（b-desc）。A 在 TMEM 中的物理 packing 与 FP32 D 不同，本页只画逻辑 A tile。'
+        : 'A、B 都由 SMEM 矩阵描述符给出（a-desc / b-desc）。',
+      fAlignNote: L.layout === 'F' ? 'Layout F 只用半数 datapath：A（若在 TMEM）与 D 必须使用相同的 lane alignment（PTX Data Path Layout Organization）。' : null,
+      nRule: (function () { var r = nRule(c.kind, c.ws, c.m, c.aSrc); delete r.check; return r; })()
+    };
+  }
+
+  /** 完整关系表：3 kind × {非 .ws, .ws} × M{32,64,128} */
+  function table() {
+    var out = [];
+    KIND_IDS.forEach(function (k) {
+      [false, true].forEach(function (ws) {
+        M_VALUES.forEach(function (m) {
+          var L = legality(k, ws, m);
+          out.push({ kind: k, ws: ws, m: m, ok: L.ok, layout: L.layout, K: KINDS[k].K, reason: L.reason,
+            isCurrentKernel: k === 'mxf8f6f4' && !ws && m === 128 });
+        });
+      });
+    });
+    return out;
+  }
+
+  /** 选中某个 layout 时，给出与之一致的合法配置（尽量保留当前 kind / ws / A 来源） */
+  function configForLayout(layoutId, current) {
+    var nz = normalize(current); var c = nz.cfg ? nz.cfg : clone(DEFAULT);
+    var want = { D: [[c.ws, 128], [false, 128], [true, 128]], E: [[true, 64]], F: [[false, 64]], G: [[true, 32]] }[layoutId];
+    if (!want) return fail('未知布局 ' + layoutId);
+    for (var i = 0; i < want.length; i++) {
+      if (legality(c.kind, want[i][0], want[i][1]).ok) {
+        var keep = clone(c); keep.ws = want[i][0]; keep.m = want[i][1];
+        return { ok: true, cfg: keep, changedKind: false, notice: null };
+      }
+    }
+    var demo = clone(c); demo.kind = 'f8f6f4'; demo.ws = want[0][0]; demo.m = want[0][1];
+    return { ok: true, cfg: demo, changedKind: true,
+      notice: KINDS[c.kind].label + ' 不能得到 Layout ' + layoutId + '（MXFP8 单 CTA 只有非 .ws、M=128 → Layout D）；已自动切换到普通 FP8 演示组合：' +
+        (demo.ws ? '.ws' : '非 .ws') + '、M=' + demo.m };
+  }
+
+  /* ---------------- 数据流图 ---------------- */
+  function fmtBytes(b) { return b >= 1024 ? (b / 1024) + ' KiB（' + b + ' B）' : b + ' B'; }
+
+  /**
+   * flow(cfg, N) → {ok, nodes, edges, events}
+   * 每条边：{id, from, to, role, label, active, instr, issuer{who,text}, amount{text,shape,elements,bytes},
+   *          src, dst, prep, done, note, sources[], overviewLink}
+   */
+  function flow(cfg, N) {
+    var R = resolve(cfg); if (!R.ok) return R;
+    if (N_DEMO.indexOf(N) < 0) return fail('图形演示只接受 N = 64 / 128 / 256');
+    var c = R.cfg, K = KINDS[c.kind], M = c.m, kk = K.K, ts = c.aSrc === 'tmem', bs = K.blockScale;
+    var nodes = [], edges = [], events = [];
+    function node(id, label, sub, space, extra) { var n = { id: id, label: label, sub: sub, space: space }; if (extra) for (var k in extra) n[k] = extra[k]; nodes.push(n); }
+    var aBytes = M * kk * K.abBytes, bBytes = kk * N * K.abBytes, dBytes = M * N * 4;
+    var MMA_ISSUER = { who: 'single-thread', text: 'MMA warp 中由 elect_one_sync() 选出的单个线程发起（tcgen05.mma 是单线程语义，一个线程发起整条 MMA）' };
+    var SYNC_CP = '同一线程先发 tcgen05.cp、再发读取该地址的 tcgen05.mma：PTX 把 tcgen05.cp(writes) → tcgen05.mma(A reads)（同 cta_group、同地址）列为 pipelined 对，二者按程序序访问，无需显式 wait 或线程同步（canonical 9.7.18.6.4.1）。若 cp 与 mma 由同一 warp 的不同线程发出，仍无需显式 wait，但需要恰当的线程间同步（官方示例用 bar.warp.sync；9.7.18.6.4.3）。cp 的完成本身可由 tcgen05.commit 观察。';
+    var SYNC_ST = 'tcgen05.st → tcgen05.mma 不是 pipelined 对，必须显式等待：同一线程为 st → tcgen05.wait::st → mma（wait::st 是同步指令，等待本线程此前的 st 完成；canonical 9.7.18.6.4.2 / tcgen05.wait 示例 2）。不同线程（例如 A 跨多个 32-lane 组，而每个 warp 只能写自己的 lane 组，就需要多个 warp 写入）：写入方 st → wait::st → tcgen05.fence::before_thread_sync → mbarrier.arrive / barrier；MMA 线程等待后 tcgen05.fence::after_thread_sync → mma（9.7.18.6.4.4）。本页假定采用这种充分同步。';
+
+    // ---- 节点
+    if (!ts || c.aPrep === 'cp') node('smemA', 'SMEM A', ts ? 'tcgen05.cp 的源（须匹配 TMEM A packing）' : 'A tile ' + M + '×' + kk + '（a-desc）', 'smem');
+    if (ts && c.aPrep === 'st') node('regA', '寄存器（A 源数据）', '由 warp 计算/加载得到', 'reg');
+    node('smemB', 'SMEM B', 'B tile ' + kk + '×N=' + kk + '×' + N + '（b-desc）', 'smem');
+    if (ts) node('tmemA', 'TMEM A', 'A tile ' + M + '×' + kk + '（[a-tmem]，逻辑 tile）', 'tmem');
+    if (bs) {
+      node('smemSFA', 'SMEM SFA', 'scale A：' + M + ' 行 × 1（UE8M0）', 'smem');
+      node('smemSFB', 'SMEM SFB', 'scale B：' + N + ' 列 × 1（UE8M0）', 'smem');
+      node('tmemSFA', 'TMEM SFA', '[scale-A-tmem]', 'tmem');
+      node('tmemSFB', 'TMEM SFB', '[scale-B-tmem]', 'tmem');
+    }
+    var formula = (bs ? 'D = (A⊙SFA)·(B⊙SFB)' : 'D = A·B') + (c.enableInputD ? ' + D' : '');
+    node('tc', 'Tensor Core（黑盒）', M + '×' + N + '×' + kk + ' · ' + formula, 'tc', { shape: M + '×' + N + '×' + kk, formula: formula });
+    node('tmemD', 'TMEM D', '旧 D / 结果 D：同一 [d-tmem] · Layout ' + R.layout + ' · ' + M + '×' + N + ' FP32', 'tmem', { layout: R.layout });
+    node('regs', '寄存器（epilogue warp）', 'tcgen05.ld 后每线程的值', 'reg');
+
+    // ---- 边
+    var readyA = '本条 MMA 发起前，A tile 已完整写入 SMEM：当前 kernel 中 TMA 以 complete_tx 通知 full_barriers（kernel:255–287），MMA 线程等待 with_sf_full_barriers 后执行 tcgen05.fence::after_thread_sync（kernel:351–352）';
+    if (!ts) edges.push({
+      id: 'smemA-tc', from: 'smemA', to: 'tc', role: 'operand', label: 'A：a-desc', active: true,
+      instr: R.instr, issuer: MMA_ISSUER,
+      amount: { text: '一条 MMA 读取 A 的 M×K = ' + M + '×' + kk + ' 个 ' + (K.abBytes === 1 ? 'FP8' : 'BF16') + '（' + fmtBytes(aBytes) + '）', shape: [M, kk], elements: M * kk, bytes: aBytes },
+      src: 'SMEM（a-desc：起始地址、LBO/SBO、swizzle）', dst: 'Tensor Core 内部（黑盒）',
+      prep: readyA, done: '读取由 MMA 本身完成；SMEM stage 何时可覆盖由 tcgen05.commit 通知（见“完成通知”事件）',
+      note: '一条 MMA 覆盖整个 ' + M + '×' + kk + ' 逻辑 A tile，不是某个 CUDA 线程计算其中一行。K=' + kk + ' 是单条指令的 K，不是整个 workload 的 K（BLOCK_K=128 时 kernel 连发 ' + (128 / kk) + ' 条）。',
+      sources: ['src-flow-mma-loop', 'src-umma-wrap']
+    });
+    edges.push({
+      id: 'smemB-tc', from: 'smemB', to: 'tc', role: 'operand', label: 'B：b-desc', active: true,
+      instr: R.instr, issuer: MMA_ISSUER,
+      amount: { text: '一条 MMA 读取 B 的 K×N = ' + kk + '×' + N + ' 个 ' + (K.abBytes === 1 ? 'FP8' : 'BF16') + '（' + fmtBytes(bBytes) + '）' + (c.ws ? '（默认 collector::b0::discard 时）' : ''), shape: [kk, N], elements: kk * N, bytes: bBytes },
+      src: 'SMEM（b-desc）', dst: 'Tensor Core 内部（黑盒）',
+      prep: readyA.replace('A tile', 'B tile'), done: '同上：由 tcgen05.commit 通知 SMEM stage 可复用',
+      note: 'B 始终来自 SMEM（b-desc），SS 与 TS 都一样。' + (c.ws
+        ? ' .ws：本演示按默认 .collector::b0::discard，每条 MMA 都从 SMEM 读取 B；若指定 .collector::bN::fill / ::use / ::lastuse，后续 MMA 可以复用 Tensor Core collector buffer #N 中的 B 而不重新从 SMEM 读取（tcgen05.mma.ws 的 collector 语义），所以不能笼统说 .ws 每条都读 SMEM。'
+        : ''),
+      sources: ['src-flow-mma-loop']
+    });
+    if (ts) {
+      edges.push({
+        id: 'tmemA-tc', from: 'tmemA', to: 'tc', role: 'operand', label: 'A：[a-tmem]', active: true,
+        instr: R.instr, issuer: MMA_ISSUER,
+        amount: { text: '一条 MMA 读取 A 的 M×K = ' + M + '×' + kk + ' 个元素（逻辑 tile；物理字节布局未展开）', shape: [M, kk], elements: M * kk, bytes: aBytes },
+        src: 'TMEM（[a-tmem] 地址）', dst: 'Tensor Core 内部（黑盒）',
+        prep: c.aPrep === 'cp' ? SYNC_CP : SYNC_ST,
+        done: 'TMEM A 被下一次写入覆盖前，本条 MMA 须已读完：同一线程后续的 tcgen05.cp 写同一地址由 mma(A reads)→cp(writes) pipelined 对保证；其他情况通过 tcgen05.commit → mbarrier 观察完成',
+        note: 'TS 是 PTX 合法路径（[a-tmem] 语法），不是当前 DeepGEMM 已实现的路径。A 在 TMEM 中的 packing 与 FP32 D 不同，不能套用 D[m,n]→lane/column 映射；CUTLASS 的 TS 封装还要求 A 为 K-major。' +
+          (R.layout === 'F' ? ' Layout F：A 与 D 必须使用相同的 lane alignment。' : ''),
+        sources: ['src-umma-wrap']
+      });
+      if (c.aPrep === 'st') edges.push({
+        id: 'regA-tmemA', from: 'regA', to: 'tmemA', role: 'copy', label: 'tcgen05.st（warp 集体）', active: true,
+        instr: 'tcgen05.st.sync.aligned.<shape>.<num>.b32 [taddr], r;\ntcgen05.wait::st.sync.aligned;',
+        issuer: { who: 'warp', text: '每个参与的 warp 的 32 个线程集体执行（.sync.aligned）；每个 warp 只能写自己 warp_rank%4 对应的 32-lane 组' },
+        amount: { text: '目标是 M×K = ' + M + '×' + kk + ' 的逻辑 A tile；按所选 st 形状分若干次写入（本页不展开具体形状与 packing）', shape: [M, kk], elements: M * kk, bytes: aBytes },
+        src: '各线程寄存器', dst: 'TMEM A（需符合 A 在 TMEM 中要求的 packing' + (R.layout === 'F' ? '，且与 D 同一 lane alignment' : '') + '）',
+        prep: '寄存器中已有 A 数据', done: SYNC_ST,
+        note: '抽象合法路径示意；当前 DeepGEMM 没有这条路径。', sources: []
+      });
+      else edges.push({
+        id: 'smemA-tmemA', from: 'smemA', to: 'tmemA', role: 'copy', label: 'tcgen05.cp（单线程）', active: true,
+        instr: 'tcgen05.cp.cta_group::1.<shape>{.multicast} [taddr], s-desc;',
+        issuer: { who: 'single-thread', text: '单个线程发起（异步拷贝）' },
+        amount: { text: '目标是 M×K = ' + M + '×' + kk + ' 的逻辑 A tile；拷贝形状（.128x256b / .128x128b / .64x128b / .32x128b 等）必须让结果匹配 A 在 TMEM 中的 packing', shape: [M, kk], elements: M * kk, bytes: aBytes },
+        src: 'SMEM（s-desc）', dst: 'TMEM A',
+        prep: 'SMEM 源数据已就绪', done: SYNC_CP,
+        note: '抽象合法路径示意；当前 DeepGEMM 没有这条路径（kernel 只对 scale factor 使用 tcgen05.cp）。本页不展开具体 shape 与 A packing 的对应。', sources: []
+      });
+    }
+    if (bs) {
+      var sfNote = '当前 kernel：SF 先由 TMA 写入 SMEM（kernel:275–282），warp 2 在 SMEM 内转置成 UTCCP 需要的排布并 fence_view_async_shared 后 arrive with_sf_full_barriers（kernel:457–476）；MMA 线程等待后，在同一个选中线程里按程序序先发 tcgen05.cp，再发 tcgen05.mma（kernel:356–400），中间没有额外的 wait 或线程同步。PTX 把同线程的 tcgen05.cp(writes) → tcgen05.mma(A and metadata reads) 列为 pipelined 对（9.7.18.6.2、canonical 9.7.18.6.4.1）；scale factor 读取是否属于该条目中的 “metadata”，本地 PTX 摘录没有逐字说明，本页只陈述 kernel 的做法。';
+      ['A', 'B'].forEach(function (x) {
+        var rows = x === 'A' ? M : N;
+        edges.push({
+          id: 'smemSF' + x + '-tmemSF' + x, from: 'smemSF' + x, to: 'tmemSF' + x, role: 'copy', label: 'tcgen05.cp SF' + x, active: true,
+          instr: 'tcgen05.cp.cta_group::1.32x128b.warpx4 [taddr], s-desc;   // kernel 使用的 SM100_UTCCP_4x32dp128bit_1cta',
+          issuer: { who: 'single-thread', text: '与 MMA 同一个 elect_one_sync() 选中线程发起' },
+          amount: { text: 'kernel 每条 cp 处理 SMEM 中 128 个 uint32 的 SF（kNumUTCCPAlignedElems=128；每个 uint32 打包 4 个 UE8M0），以 32x128b.warpx4 复制到 TMEM 的 4 个 lane 组。一条 MMA（K=32）每' + (x === 'A' ? '行' : '列') + '只用 1 个 UE8M0：共 ' + rows + ' 个（' + rows + ' B）', shape: [rows, 1], elements: rows, bytes: rows },
+          src: 'SMEM SF' + x + '（已转置）', dst: 'TMEM SF' + x + '（kTmemStartColOfSF' + x + ' 起的列）',
+          prep: '同 A/B：等待 with_sf_full_barriers；kernel 只在 k_block_idx % kNumSF' + x + 'StagesPerLoad == 0 时拷贝（粒度 128 时每 4 个 k block 一次）',
+          done: '当前 kernel：同一选中线程按程序序随后发出 MMA，中间不插 wait；这是一组约束，不是每条边各有一个 barrier',
+          note: sfNote, sources: ['src-flow-sf-cp', 'src-flow-sf-transpose']
+        });
+        edges.push({
+          id: 'tmemSF' + x + '-tc', from: 'tmemSF' + x, to: 'tc', role: 'operand', label: '[scale-' + x + '-tmem]', active: true,
+          instr: R.instr, issuer: MMA_ISSUER,
+          amount: { text: 'scale_vec::1X / block32：每 32 个 K 一个 scale；本条 MMA 读取 ' + (x === 'A' ? 'M×1 = ' + M : 'N×1 = ' + N) + ' 个 UE8M0（idesc 中的 SF' + x + '_ID 选择 TMEM 字内的字节）', shape: [rows, 1], elements: rows, bytes: rows },
+          src: 'TMEM SF' + x, dst: 'Tensor Core 内部（黑盒）',
+          prep: '当前 kernel：tcgen05.cp 已由同一线程先行发出', done: '随 MMA 完成（tcgen05.commit 观察）',
+          note: '这是与 A/B 并列的独立输入。普通 FP8 与 BF16 没有这条路径。', sources: ['src-flow-mma-loop']
+        });
+      });
+    }
+    edges.push({
+      id: 'tmemD-tc', from: 'tmemD', to: 'tc', role: 'feedback', label: c.enableInputD ? '旧 D（enable-input-d = true）' : '不读旧 D（enable-input-d = false）',
+      active: c.enableInputD, instr: R.instr, issuer: MMA_ISSUER,
+      amount: c.enableInputD ? { text: '读取同一 [d-tmem] 处的旧 D：M×N = ' + M + '×' + N + ' FP32（' + fmtBytes(dBytes) + '）', shape: [M, N], elements: M * N, bytes: dBytes }
+        : { text: '本条 MMA 计算 D = A·B，不读取 TMEM 中原有内容', shape: [M, N], elements: 0, bytes: 0 },
+      src: 'TMEM D（同一 d-tmem 地址）', dst: 'Tensor Core 内部（黑盒）',
+      prep: c.enableInputD ? '上一条写同一 D 的 MMA 已按 tcgen05 异步顺序排在前面；不需要先读回寄存器' : '首轮：当前 kernel 以 kUMMAKIdx > 0 or k_block_idx > 0 作为 enable-input-d（kernel:398–399），每个 tile 的第一条 MMA 为 false',
+      done: '—',
+      note: '累加在 TMEM 内完成：连续的 MMA 读写同一 [d-tmem]，中间不经过寄存器。',
+      sources: ['src-flow-mma-loop']
+    });
+    edges.push({
+      id: 'tc-tmemD', from: 'tc', to: 'tmemD', role: 'mma-out', label: '结果 D → [d-tmem]（Layout ' + R.layout + '）', active: true,
+      instr: R.instr, issuer: MMA_ISSUER,
+      amount: { text: '一条 MMA（本条 K=' + kk + ' 步）计算 ' + formula + '，M×N×K = ' + M + '×' + N + '×' + kk + '，写回 M×N = ' + M + '×' + N + ' 个 FP32（' + fmtBytes(dBytes) + '）到同一 [d-tmem]' + (bs ? '；SFA/SFB 经独立的 [scale-A-tmem] / [scale-B-tmem] 端口进入，每 32 个 K 一个 scale' : ''), shape: [M, N], elements: M * N, bytes: dBytes },
+      src: 'Tensor Core 内部（黑盒）', dst: 'TMEM D：按 Layout ' + R.layout + ' 组织（' + NOTATION[R.layout] + '）',
+      prep: '输入就绪（见上）', done: '完成情况只能通过 tcgen05.commit → mbarrier 观察',
+      note: '结果的 lane/column 映射见下方“联动总览”（单 FP32 atom、基址 0）。' + (R.fAlignNote || ''),
+      sources: ['src-flow-mma-loop'], overviewLink: true
+    });
+    var ldD = R.layout === 'D';
+    edges.push({
+      id: 'tmemD-regs', from: 'tmemD', to: 'regs', role: 'ld', label: 'tcgen05.ld（warp 集体）', active: true,
+      instr: ldD && R.isCurrentKernel ? 'tcgen05.ld.sync.aligned.32x32b.x8.b32 {r0..r7}, [taddr];\ntcgen05.wait::ld.sync.aligned;' : 'tcgen05.ld.sync.aligned.<shape>.<num>.b32 r, [taddr];\ntcgen05.wait::ld.sync.aligned;',
+      issuer: { who: 'warp', text: '访问 warp 的 32 个线程集体执行 .sync.aligned（所有线程给同一 taddr）；每个 warp 只能读自己 warp_rank%4 对应的 lane 组。访问 warp 不是 MMA 发射 warp' },
+      amount: ldD && R.isCurrentKernel
+        ? { text: '当前 kernel：每条 32x32b.x8 由一个 warp 读 32 lane × 8 列；线程 t 拿到 lane 32W+t 的 8 个 FP32（BM=128 时 4 个 warp、每线程共 N/8 = ' + (N / 8) + ' 次）', shape: [32, 8], elements: 256, bytes: 1024 }
+        : { text: '访问 warp W 读自己 lane 组内的数据；需选合适的 tcgen05.ld 形状，本页不给出未经验证的线程/寄存器映射', shape: [32, null], elements: null, bytes: null },
+      src: 'TMEM D', dst: '寄存器',
+      prep: '当前 kernel：tile 最后一条 MMA 后 tcgen05.commit 到 tmem_full_barriers（kernel:322–335、431）；epilogue warp 等待后执行 tcgen05.fence::after_thread_sync（kernel:503–504）',
+      done: '当前 kernel 在使用寄存器前显式执行 tcgen05.wait::ld（store_cd:123–124 的 fence_view_async_tmem_load）。PTX：同一线程中对 ld 目标寄存器的真实寄存器依赖会被遵守，但它不蕴含其他顺序；要保证内存访问顺序、避免 ld 周围的反依赖风险，须用 tcgen05.wait::ld（canonical 9.7.18.6.4.5）',
+      note: ldD ? '已核实的映射只有 Layout D + 32x32b.x8（见总览中的线程/寄存器）。' : 'Layout ' + R.layout + '：只能确定元素属于哪个访问 warp（W = ⌊lane/32⌋），线程/寄存器映射取决于所选 ld 形状，本页不伪造。',
+      sources: ['src-ld', 'src-warpsel'], overviewLink: true
+    });
+
+    // ---- 事件（约束，不是每条边各有一个 barrier）
+    events.push({ id: 'ev-ready', at: 'smemB', label: '输入就绪',
+      text: '约束：MMA 发起前 SMEM 输入必须写好并对 tcgen05 可见。当前 kernel：TMA 用 mbarrier complete_tx 通知 full_barriers；' + (bs ? 'warp 2 转置 SF 后 arrive with_sf_full_barriers；' : '') + 'MMA 线程 wait 后执行 tcgen05.fence::after_thread_sync（kernel:287、351–352）。这是一组事件，不代表每条输入边各有一个 barrier。',
+      sources: ['src-flow-mma-loop'] });
+    events.push({ id: 'ev-commit', at: 'tmemD', label: 'commit 通知',
+      text: 'tcgen05.commit 让 mbarrier 在该线程此前发出的异步 tcgen05 操作完成后到达。当前 kernel 每个 k block 后 commit 到 empty_barriers（释放 SMEM stage），tile 最后一个 k block 再 commit 到 tmem_full_barriers（通知 epilogue 可读 D）（kernel:322–335、429–431；cutlass barrier.h:766–770）。',
+      sources: ['src-flow-commit'] });
+    events.push({ id: 'ev-waitld', at: 'regs', label: 'wait::ld',
+      text: '当前 kernel 读完 TMEM 后显式执行 tcgen05.wait::ld（cutlass::arch::fence_view_async_tmem_load，sm100_store_cd.cuh:123–124），保证 ld 已完成，再写 SMEM、并在最后 arrive tmem_empty 让 MMA 复用 TMEM。PTX 规定：同线程中对 ld 目标寄存器的真实寄存器依赖总会被遵守，但它不蕴含内存访问顺序；要保证内存顺序并避免 ld 周围的反依赖风险，须使用 tcgen05.wait::ld（canonical 9.7.18.6.4.5）。',
+      sources: ['src-ld'] });
+
+    var REFS_OF = {
+      'smemA-tc': ['mma', 'shape'], 'smemB-tc': c.ws ? ['mmaWs', 'shape'] : ['mma', 'shape'], 'tmemA-tc': c.aPrep === 'cp' ? ['pipeSame', 'pipeDiff', 'pipelined'] : ['nonPipeSame', 'nonPipeDiff', 'wait', 'fence'],
+      'regA-tmemA': ['st', 'wait', 'nonPipeSame', 'nonPipeDiff', 'fence'], 'smemA-tmemA': ['cp', 'pipeSame', 'pipeDiff', 'pipelined'],
+      'smemSFA-tmemSFA': ['cp', 'pipelined', 'pipeSame'], 'smemSFB-tmemSFB': ['cp', 'pipelined', 'pipeSame'], 'tmemSFA-tc': ['blockScale', 'mma'], 'tmemSFB-tc': ['blockScale', 'mma'],
+      'tmemD-tc': ['mma', 'pipelined'], 'tc-tmemD': [c.ws ? 'mmaWs' : 'mma', 'pipelined'], 'tmemD-regs': ['ld', 'nonPipeDiff', 'regDep', 'wait']
+    };
+    edges.forEach(function (e) { e.ptxRefs = refs(REFS_OF[e.id] || []); });
+    var EV_REFS = { 'ev-ready': ['fence', 'asyncOps'], 'ev-commit': ['nonPipeSame', 'nonPipeDiff', 'pipelined'], 'ev-waitld': ['regDep', 'wait'] };
+    events.forEach(function (ev) { ev.ptxRefs = refs(EV_REFS[ev.id]); });
+
+    return { ok: true, cfg: c, N: N, layout: R.layout, resolved: R, nodes: nodes, edges: edges, events: events };
+  }
+
+  var api = {
+    version: '1.0',
+    KIND_IDS: KIND_IDS.slice(), M_VALUES: M_VALUES.slice(), N_DEMO: N_DEMO.slice(),
+    DEFAULT: clone(DEFAULT),
+    kinds: function () { return KIND_IDS.map(function (k) { var K = KINDS[k]; return { id: k, label: K.label, ptxKind: K.ptxKind, K: K.K, abType: K.abType, blockScale: K.blockScale, wsAllowed: K.wsAllowed, nonWsM: K.nonWsM.slice(), wsM: K.wsM.slice() }; }); },
+    legality: function (kind, ws, m) { return clone(legality(kind, ws, m)); },
+    resolve: resolve,
+    table: table,
+    nRule: function (kind, ws, m, aSrc) { var r = nRule(kind, ws, m, aSrc || 'smem'); if (!r) return null; delete r.check; return r; },
+    checkN: checkN,
+    configForLayout: configForLayout,
+    flow: flow
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.MmaFlowModel = api;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/*
+ * PartitionModel —— “选中 TMEM D 的一个 layout 分区 → 所需 SMEM A/B 行区间与 K 片段 → TMEM 物理区域” 的纯数据模型（无 DOM）。
+ * 浏览器中挂到 window.PartitionModel；node 中 module.exports。复用 LayoutModel（物理坐标/分区）与 MmaFlowModel（指令合法性）。
+ *
+ * 范围：SM100、单 CTA、稠密、SS（A/B 都来自 SMEM，K-major），FP32 累加，单条 MMA 的完整合法 M×N tile，BK=128。
+ *   这是 ISA 完整 tile 教学：MMA_M 是指令 M（32/64/128），不是 DeepGEMM 小 M 示例里的 workload 有效行数或 BLOCK_M。
+ * SMEM 物理排布：TMA SWIZZLE_128B、K-major；BK·sizeof 超过 128 B 时按 128 B atom 沿 K 拆分，
+ *   第 i 个 atom 放在 i·rows·128 B 处（DeepGEMM tma_copy.cuh:30–34 的放置方式）；stage 基址 1024 B 对齐（kernel:97–98、137）。
+ *   128B swizzle：行 r 内第 c 个 16 B 块的物理位置为 c ⊕ (r mod 8)。
+ */
+(function (root) {
+  'use strict';
+  var LM = root.LayoutModel || (typeof require !== 'undefined' ? require('./model.js') : null);
+  var MF = root.MmaFlowModel || (typeof require !== 'undefined' ? require('./flow-model.js') : null);
+
+  var BK = 128;
+  var ATOM_BYTES = 128;          // 128B swizzle atom 的 K 方向宽度
+  var COLORS = ['#2f6fd0', '#e07b28', '#239a62', '#8a55c9'];
+
+  function fail(msg) { return { ok: false, error: msg }; }
+  function isInt(x) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x; }
+
+  /** 解析配置：必须合法、必须是 SS；返回 {R(resolve), K, eb, steps} */
+  function ctx(cfg, N, alignment) {
+    var R = MF.resolve(cfg);
+    if (!R.ok) return fail(R.error);
+    if (R.cfg.aSrc !== 'smem') return fail('本视图只讲 SS（A、B 都来自 SMEM）；当前选择 TS（A 来自 TMEM），此视图不适用');
+    if (MF.N_DEMO.indexOf(N) < 0) return fail('本视图演示 N = 64 / 128 / 256');
+    var al = R.layout === 'F' ? (alignment || 0) : 0;
+    if (R.layout === 'F' && al !== 0 && al !== 16) return fail('Layout F 的 lane alignment 只能是 0 或 16');
+    if (R.layout !== 'F' && alignment) return fail('alignment 只对 Layout F 有意义');
+    var eb = R.kind.abBytes;
+    return { ok: true, R: R, cfg: R.cfg, layout: R.layout, M: R.cfg.m, N: N, K: R.K, eb: eb, steps: BK / R.K, align: al };
+  }
+
+  /** k_step 信息：单条 MMA 的 K 片段 */
+  function kSteps(kind) {
+    var k = MF.kinds().filter(function (x) { return x.id === kind; })[0];
+    if (!k) return fail('未知 kind');
+    var out = [];
+    for (var j = 0; j < BK / k.K; j++) out.push({ step: j, kRange: [j * k.K, j * k.K + k.K - 1], enableInputD: j > 0 });
+    return { ok: true, BK: BK, K: k.K, count: BK / k.K, steps: out };
+  }
+
+  /** 布局的 4 个分区（观察单位） */
+  function partitions(cfg, N, alignment) {
+    var c = ctx(cfg, N, alignment); if (!c.ok) return c;
+    var RG = LM.regions(c.layout, N, c.align);
+    return {
+      ok: true, layout: c.layout, notation: LM.getLayout(c.layout).notation, M: c.M, N: N, K: c.K, BK: BK, steps: c.steps,
+      columnSpan: RG.columnSpan,
+      parts: RG.regions.map(function (r) {
+        return { warp: r.warp, color: COLORS[r.warp], D: { mRange: r.mRange.slice(), nRange: r.nRange.slice(), shape: r.shape.slice() },
+          tmem: { lanes: r.activeLanes.slice(), laneGroup: r.laneGroup.slice(), columns: r.physColumns.slice(), unusedLanes: r.unusedLanes ? r.unusedLanes.slice() : null } };
+      })
+    };
+  }
+
+  /**
+   * select(cfg, N, alignment, warp, kStep) → 选中分区在第 kStep 步所需的 A/B 范围与 TMEM 区域。
+   * A 以 M×BK、B 以 N×BK 表示（都是 K-major，横轴 K；B 的行轴是原 N）。
+   */
+  function select(cfg, N, alignment, warp, kStep) {
+    var P = partitions(cfg, N, alignment); if (!P.ok) return P;
+    if (!isInt(warp) || warp < 0 || warp > 3) return fail('分区编号（访问 warp W）需为 0..3');
+    if (!isInt(kStep) || kStep < 0 || kStep >= P.steps) return fail('k_step 需在 0..' + (P.steps - 1) + '（BK=' + BK + '，单条 MMA K=' + P.K + '）');
+    var p = P.parts[warp], k0 = kStep * P.K, kr = [k0, k0 + P.K - 1];
+    var c = ctx(cfg, N, alignment);
+    var bs = c.R.kind.blockScale;
+    return {
+      ok: true, layout: P.layout, notation: P.notation, warp: warp, color: p.color,
+      mma: { M: P.M, N: N, K: P.K, shape: P.M + '×' + N + '×' + P.K, kind: c.R.kind.ptxKind, ws: c.cfg.ws },
+      kStep: kStep, steps: P.steps, BK: BK, enableInputD: kStep > 0,
+      D: p.D, tmem: p.tmem,
+      A: { rows: p.D.mRange.slice(), kRange: kr, tileRows: P.M, tileK: BK, shape: [p.D.shape[0], P.K] },
+      B: { rows: p.D.nRange.slice(), kRange: kr, tileRows: N, tileK: BK, shape: [p.D.shape[1], P.K], rowAxis: 'N' },
+      scale: bs ? { sfaRows: p.D.mRange.slice(), sfbRows: p.D.nRange.slice(), kBlock: Math.floor(k0 / 32), note: 'MXFP8：每 32 个 K 一个 UE8M0；这条 MMA 使用 SFA 行 ' + p.D.mRange.join('–') + '、SFB 行 ' + p.D.nRange.join('–') + ' 的第 ' + Math.floor(k0 / 32) + ' 个 K 块 scale（经 [scale-A-tmem]/[scale-B-tmem] 作为附加输入）' } : null,
+      accumulate: '选中分区内每个 D[m,n] 由这条 MMA 计算 Σ_{k=' + kr[0] + '..' + kr[1] + '} A[m,k]·B[n,k]（长度 ' + P.K + ' 的点积片段）' + (kStep > 0 ? '，累加到同一 TMEM 位置的旧值上（enable-input-d=true）' : '；作为 tile 的第一条 MMA，enable-input-d=false，直接初始化 D（不读旧值）'),
+      window: '选中分区只是观察窗口：这条 MMA 仍计算整个 ' + P.M + '×' + N + ' tile；由一个线程发起整条 MMA，不表示该线程逐元素搬运 A/B',
+      stepNote: '本页只显示一条 MMA 的 K 片段 ' + kr[0] + '–' + kr[1] + '（单条指令 K=' + P.K + '）。底层 SMEM stage 仍是 BK=' + BK + '：同一 stage 里其余 K 片段由后续 MMA 依次读取并累加到同一 [d-tmem]（enable-input-d=true），本页不展开',
+      fragment: { kRange: kr, K: P.K, stageBK: BK, stageNote: '观察窗口只裁出 K ' + kr[0] + '–' + kr[1] + '；SMEM 中的真实排布、行跨度与 descriptor 仍按 BK=' + BK + ' 的 stage 计算' }
+    };
+  }
+
+  /* ---------------- SMEM 物理排布 ---------------- */
+  function opInfo(c, operand) {
+    if (operand !== 'A' && operand !== 'B') return null;
+    var rows = operand === 'A' ? c.M : c.N;
+    var rowBytes = BK * c.eb, atoms = rowBytes / ATOM_BYTES;
+    return { operand: operand, rows: rows, rowBytes: rowBytes, atoms: atoms, atomElems: ATOM_BYTES / c.eb, stageBytes: rows * rowBytes, base: operand === 'A' ? 'smem_a[stage]' : 'smem_b[stage]' };
+  }
+  /** 元素 (row, k) 在 stage 内的字节偏移、swizzle 前后 16 B 块号、bank */
+  function addressOf(cfg, N, operand, row, k) {
+    var c = ctx(cfg, N, 0);   // SMEM 排布与 F alignment 无关
+    if (!c.ok) return c;
+    var o = opInfo(c, operand); if (!o) return fail('operand 只能是 A 或 B');
+    if (!isInt(row) || row < 0 || row >= o.rows) return fail(operand + ' 的行需在 0..' + (o.rows - 1));
+    if (!isInt(k) || k < 0 || k >= BK) return fail('k 需在 0..' + (BK - 1));
+    var kb = k * c.eb, atom = Math.floor(kb / ATOM_BYTES), inAtom = kb % ATOM_BYTES;
+    var chunk = Math.floor(inAtom / 16), phys = chunk ^ (row % 8), byteIn = inAtom % 16;
+    var off = atom * o.rows * ATOM_BYTES + row * ATOM_BYTES + phys * 16 + byteIn;
+    return { ok: true, operand: operand, row: row, k: k, atom: atom, chunk: chunk, physChunk: phys, byteInChunk: byteIn, offset: off,
+      bank: Math.floor(off / 4) % 32, banks: [phys * 4, phys * 4 + 3], expr: o.base + ' + ' + off };
+  }
+
+  /** 选中分区、第 kStep 步时 A/B 的 SMEM 视图：前 8 行（一个 swizzle 周期）的块位置、地址与 bank，以及 descriptor 字段 */
+  function smemView(cfg, N, alignment, warp, kStep, operand) {
+    var S = select(cfg, N, alignment, warp, kStep); if (!S.ok) return S;
+    var c = ctx(cfg, N, alignment), o = opInfo(c, operand); if (!o) return fail('operand 只能是 A 或 B');
+    var rng = operand === 'A' ? S.A.rows : S.B.rows, kr = S.A.kRange;
+    var kbytes = [kr[0] * c.eb, (kr[1] + 1) * c.eb - 1];
+    var atom = Math.floor(kbytes[0] / ATOM_BYTES), c0 = Math.floor((kbytes[0] % ATOM_BYTES) / 16), c1 = Math.floor((kbytes[1] % ATOM_BYTES) / 16);
+    var rows = [];
+    for (var r = rng[0]; r < Math.min(rng[0] + 8, rng[1] + 1); r++) {
+      var ch = [];
+      for (var lc = c0; lc <= c1; lc++) {
+        var ph = lc ^ (r % 8), off = atom * o.rows * ATOM_BYTES + r * ATOM_BYTES + ph * 16;
+        ch.push({ logicalChunk: lc, physChunk: ph, offset: off, banks: [ph * 4, ph * 4 + 3] });
+      }
+      rows.push({ row: r, chunks: ch });
+    }
+    var startOff = atom * o.rows * ATOM_BYTES + (kbytes[0] % ATOM_BYTES);   // 未 swizzle 的逻辑起点（descriptor 用）
+    var bf16 = c.eb === 2;
+    return {
+      ok: true, operand: operand, rows: o.rows, rowRange: rng.slice(), kRange: kr.slice(), kBytes: kbytes, eb: c.eb, atoms: o.atoms, atom: atom,
+      logicalChunks: [c0, c1], sampleRows: rows, stageBytes: o.stageBytes, base: o.base,
+      formula: '偏移 = atom·' + o.rows + '·128 + r·128 + ((c ⊕ (r mod 8))·16) + b；bank = ⌊偏移/4⌋ mod 32（基址 1024 B 对齐）',
+      umma: {
+        what: 'UMMA SMEM matrix descriptor（tcgen05.mma 的 ' + (operand === 'A' ? 'a-desc' : 'b-desc') + '）：每条 MMA 一个，描述这条 MMA 要读的 ' + (operand === 'A' ? c.M : N) + '×' + c.K + ' 片段（在 BK=' + BK + ' 的 stage 内）',
+        fields: [
+          ['start_address', '(' + o.base + ' + ' + startOff + ') >> 4', '片段起点：' + (o.atoms > 1 ? 'atom ' + atom + ' 起点 ' + (atom * o.rows * 128) + ' + ' : '') + 'K 字节偏移 ' + (kbytes[0] % ATOM_BYTES) + '（advance_umma_desc_lo：stage 内每往后一个 K 片段 +UMMA_K·sizeof = ' + c.K * c.eb + ' B）'],
+          ['layout_type', 'SWIZZLE_128B', 'to_umma_layout_type：K-major、swizzle 128 B'],
+          ['SBO（stride byte offset）', '1024 B（编码 >>4 = 64）', '相邻 8 行组之间的字节跨度 = 8 行 × 128 B'],
+          ['LBO（leading byte offset）', '0', 'K-major swizzle 下单条 MMA 的 K 片段（' + c.K * c.eb + ' B）不跨 atom；DeepGEMM 置 0'],
+          ['version / lbo_mode / base_offset', '1 / 0 / 0', 'make_smem_desc（mma/sm100.cuh:14–38）']
+        ],
+        note: bf16 ? '教学推导：DeepGEMM 的 BF16 实际取 BLOCK_K = 128/sizeof = 64（heuristics/sm100.hpp:29），只有一个 atom；本页 BK=128 时 K 方向有 2 个 128 B atom，第 j 步起点按上式跨入 atom ⌊16j/64⌋。SBO 与 BK=64 时相同（8·64·2 = 1024 B）。'
+          : 'FP8 K-major、BK=128：与 DeepGEMM make_umma_desc（mma/sm100.cuh:94–112）的取值相同，SBO = 8·BLOCK_K·sizeof = 1024 B，LBO = 0。'
+      },
+      tma: {
+        what: 'TMA tensor map（GMEM → SMEM 搬运）：每个 k block 搬整个 ' + o.rows + '×' + BK + ' tile，不按 MMA 的 K 片段拆',
+        fields: [
+          ['dataType', c.eb === 1 ? 'UINT8（FP8 按字节搬）' : 'BFLOAT16', ''],
+          ['globalDim', '[K_total, ' + (operand === 'A' ? 'M_total' : 'N_total') + ']（内维为 K）', 'K-major：K 连续'],
+          ['boxDim', '[' + (ATOM_BYTES / c.eb) + ', ' + o.rows + ']', 'swizzle 128B 时内维 box = 128 B / ' + c.eb + ' B'],
+          ['swizzle', 'CU_TENSOR_MAP_SWIZZLE_128B', ''],
+          ['每个 k block 的 copy 次数', String(o.atoms), 'BK·sizeof / 128 B；第 i 次写到 ' + o.base + ' + i·' + (o.rows * 128) + '（tma_copy.cuh:30–34）'],
+          ['copy 坐标', '(k_block·' + BK + ' + i·' + (ATOM_BYTES / c.eb) + ', ' + (operand === 'A' ? 'm0' : 'n0') + ')', 'GMEM 基址与全局尺寸是运行时值，本页只写符号']
+        ],
+        note: 'TMA descriptor 与 UMMA descriptor 是两套东西：前者描述 GMEM 张量与搬运 box，后者描述 SMEM 中已排好的 swizzled tile 供 MMA 读取。'
+      },
+      tileNote: '完整 tile 教学：' + operand + ' 有 ' + o.rows + ' 行（= ' + (operand === 'A' ? '指令 MMA_M' : '指令 N') + '），底层 stage 为 ' + o.rows + '×' + BK + '（每行 ' + o.rowBytes + ' B）；主图只裁出 K ' + kr[0] + '–' + kr[1] + ' 这一个 MMA 片段。这与 DeepGEMM 小 M 示例中 SMEM A stage 只分配 BLOCK_M 行是不同层级。'
+    };
+  }
+
+  var api = {
+    version: '1.0', BK: BK, COLORS: COLORS.slice(),
+    kSteps: kSteps,
+    partitions: partitions,
+    select: select,
+    addressOf: addressOf,
+    smemView: smemView
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.PartitionModel = api;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* TMEM Layout 交互页（⓪ 指令 → 布局 → 分区数据流；⑤ DeepGEMM 小 M）：图形均由纯数据模型生成 */
+(function () {
+  'use strict';
+  var LM = window.LayoutModel, MF = window.MmaFlowModel, PM = window.PartitionModel;
+  var WC = ['#2f6fd0', '#e07b28', '#239a62', '#8a55c9'];
+  var WL = ['#d7e4fa', '#fbe3cd', '#d2f0e1', '#e7dcf6'];
+  var KIND_LABEL = { f8f6f4: '普通 FP8', mxf8f6f4: 'FP8 block scale', f16: 'BF16' };
+  var KIND_SUB = { f8f6f4: 'kind::f8f6f4', mxf8f6f4: 'kind::mxf8f6f4.block_scale', f16: 'kind::f16' };
+  var PTX = 'https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#';
+  var FILES = {
+    kernel: 'deep_gemm/include/deep_gemm/impls/sm100_fp8_fp4_gemm_1d1d.cuh',
+    mmaDesc: 'deep_gemm/include/deep_gemm/mma/sm100.cuh',
+    tmaCopy: 'deep_gemm/include/deep_gemm/common/tma_copy.cuh',
+    storeCd: 'deep_gemm/include/deep_gemm/epilogue/sm100_store_cd.cuh',
+    traits: 'third-party/cutlass/include/cute/atom/mma_traits_sm100.hpp'
+  };
+
+  // 页面状态：只有 ⓪ 的指令组合（固定 SS）、N、F alignment、分区选择，以及 ⑤ 的 workload M
+  var S = { cfg: { kind: 'mxf8f6f4', ws: false, m: 128 }, N: 128, align: 0, layout: 'D', notice: '', relMsg: '',
+    part: { w: null, sel: null, key: '', msg: '' }, sm: 4 };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function rng(a) { return a[0] === a[1] ? String(a[0]) : a[0] + '–' + a[1]; }
+  function nt(c) { return c.notation.replace('x', '×'); }
+  function r1(v) { return Math.round(v * 10) / 10; }
+  function rect(x, y, w, h, attrs) { return '<rect x="' + r1(x) + '" y="' + r1(y) + '" width="' + r1(Math.max(w, 0)) + '" height="' + r1(Math.max(h, 0)) + '" ' + (attrs || '') + '/>'; }
+  function text(x, y, t, attrs) { return '<text x="' + r1(x) + '" y="' + r1(y) + '" ' + (attrs || '') + '>' + t + '</text>'; }
+  function line(x1, y1, x2, y2, attrs) { return '<line x1="' + r1(x1) + '" y1="' + r1(y1) + '" x2="' + r1(x2) + '" y2="' + r1(y2) + '" ' + (attrs || '') + '/>'; }
+  function act(a) { var s = ''; for (var k in a) s += ' data-' + k + '="' + a[k] + '"'; return s + ' tabindex="0" role="button"'; }
+  function kv(rows) { return '<dl class="kv">' + rows.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('') + '</dl>'; }
+  function fileLink(key, label) { return '<a href="./' + FILES[key] + '">' + esc(label) + '</a>'; }
+  function ptxLink(anchor, label) { return '<a href="' + PTX + anchor + '" target="_blank" rel="noopener">' + esc(label) + '</a>'; }
+  function defs(p) {
+    return '<defs><pattern id="' + p + 'un" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#eceef3"/><path d="M0 0L6 6M6 0L0 6" stroke="#a9b0be" stroke-width=".8"/></pattern>' +
+      '<pattern id="' + p + 'gr" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#eef0f4"/><line x1="0" y1="0" x2="0" y2="6" stroke="#b9bfcc" stroke-width="1.6"/></pattern>' +
+      '<marker id="' + p + 'ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7d879c"/></marker></defs>';
+  }
+  // 文字宽度估算与换行（用于选择完整 / 简短标题，保证不越出 viewBox）
+  function charW(ch, fs) { return (ch.charCodeAt(0) > 0x2E7F ? 1.0 : 0.58) * fs; }
+  function estW(t, fs, bold) { return Array.from(String(t)).reduce(function (a, ch) { return a + charW(ch, fs) * (bold ? 1.15 : 1.02); }, 0); }
+  function wrapText(t, maxW, fs) {
+    var out = [], cur = '', w = 0, chars = Array.from(t);
+    for (var i = 0; i < chars.length; i++) {
+      var ch = chars[i]; cur += ch; w += charW(ch, fs);
+      if (w > maxW) {
+        var cut = -1, cs = Array.from(cur);
+        for (var j = cs.length - 1; j > cs.length - 16 && j > 0; j--) if (' ·；，、'.indexOf(cs[j]) >= 0) { cut = j + 1; break; }
+        if (cut < 0) cut = cs.length - 1;
+        out.push(cs.slice(0, cut).join('').trim());
+        cur = cs.slice(cut).join(''); w = 0; Array.from(cur).forEach(function (c) { w += charW(c, fs); });
+      }
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out;
+  }
+
+  /* ================= ⓪ 指令组合（固定 SS） ================= */
+  function mcfg(c) { c = c || S.cfg; return { kind: c.kind, ws: c.ws, m: c.m, aSrc: 'smem' }; }
+  function resolveCur() { return MF.resolve(mcfg()); }
+  function alignFor(layout) { return layout === 'F' ? S.align : 0; }
+  function tryCfg(patch) { var c = { kind: S.cfg.kind, ws: S.cfg.ws, m: S.cfg.m }; for (var k in patch) if (k in c) c[k] = patch[k]; return { cfg: c, r: MF.resolve(mcfg(c)) }; }
+  // 设置指令组合：kind 切换时若原 .ws/M 不合法，自动挑一个合法组合并说明
+  function setCfg(patch, notice) {
+    var t = tryCfg(patch);
+    S.notice = notice || ''; S.relMsg = '';
+    if (!t.r.ok && patch.kind) {
+      var cands = [[t.cfg.ws, t.cfg.m], [false, t.cfg.m], [t.cfg.ws, 128], [false, 128]];
+      for (var i = 0; i < cands.length; i++) {
+        var t2 = tryCfg({ kind: patch.kind, ws: cands[i][0], m: cands[i][1] });
+        if (t2.r.ok) {
+          S.notice = KIND_LABEL[patch.kind] + ' 不支持 ' + (t.cfg.ws ? '.ws' : '非 .ws') + ' M=' + t.cfg.m + '（' + t.r.reason + '），已改为 ' + (cands[i][0] ? '.ws' : '非 .ws') + ' M=' + cands[i][1];
+          t = t2; break;
+        }
+      }
+    }
+    if (!t.r.ok) { S.notice = t.r.error; renderMma(); return false; }
+    S.cfg = t.cfg; S.layout = t.r.layout;
+    // 保留已选 N，但先对新组合验证；不合法时改为第一个合法示例值并说明
+    var ns = legalNs();
+    if (ns.indexOf(S.N) < 0 && ns.length) { S.notice = (S.notice ? S.notice + '；' : '') + 'N=' + S.N + ' 对新组合不合法，已改为 N=' + ns[0]; S.N = ns[0]; }
+    renderMma();
+    return true;
+  }
+
+  /* ---- 单条 MMA 的计算 N：本教程示例值中，对当前 kind/.ws/M 合法（PTX Table 48）的那些 ---- */
+  function legalNs(c) { return MF.N_DEMO.filter(function (n) { var x = MF.checkN(mcfg(c), n); return x.ok && x.isa; }); }
+  function renderNSelect() {
+    var sel = $('mma-n-select'), ns = legalNs(), sig = ns.join(',');
+    if (sel.getAttribute('data-sig') !== sig) {   // 只在可选集合变化时重建 option，保留键盘焦点
+      sel.innerHTML = ns.map(function (n) { return '<option value="' + n + '">N = ' + n + '</option>'; }).join('');
+      sel.setAttribute('data-sig', sig);
+    }
+    sel.value = String(S.N);
+  }
+  // 改 N：先校验（必须是示例值且对当前组合合法），再更新共享状态；分区选择随后在 validatePart 中被清空
+  function setN(n) {
+    n = +n;
+    if (legalNs().indexOf(n) < 0) { S.notice = 'N=' + n + ' 不是本教程对当前组合提供的示例值（可选：' + legalNs().join(' / ') + '）'; renderMma(); return false; }
+    S.N = n; S.notice = ''; renderMma(); return true;
+  }
+
+  function fseg(id, items, testPrefix) {
+    $(id).innerHTML = items.map(function (it) {
+      return '<button data-v="' + it.v + '" data-testid="' + testPrefix + it.v + '"' + (it.on ? ' class="on"' : '') + (it.disabled ? ' disabled' : '') +
+        (it.reason ? ' title="' + esc(it.reason) + '"' : '') + '>' + it.label + (it.sub ? '<small>' + it.sub + '</small>' : '') + '</button>';
+    }).join('');
+  }
+  // kind / 形式 / M 只能在关系表中选择；这里只剩 Layout F 的 lane alignment
+  function renderAlign() {
+    $('flow-ctl').style.display = S.layout === 'F' ? '' : 'none';
+    fseg('seg-falign', [0, 16].map(function (a) { return { v: a, label: String(a), on: S.align === a }; }), 'falign-btn-');
+  }
+  function renderResult() {
+    var R = resolveCur(), el = $('flow-result');
+    if (!R.ok) { el.innerHTML = '<div class="warn">' + esc(R.error) + '</div>'; return; }
+    el.innerHTML = '<div class="fres">' +
+      '<div class="fres-l"><div class="lab">指令（PTX 语法模板，A/B 都用 SMEM descriptor）· ' + KIND_LABEL[S.cfg.kind] + ' · ' + (S.cfg.ws ? '.ws' : '非 .ws') + ' · M=' + S.cfg.m + '</div><pre data-testid="flow-instr">' + esc(R.instr) + '</pre></div>' +
+      '<div class="fres-arrow">→</div>' +
+      '<div class="fres-r"><div class="lab">唯一结果布局</div><div class="big" data-testid="flow-result-layout" data-layout="' + R.layout + '">Layout ' + R.layout + '</div>' +
+      '<div>' + esc(R.notation) + ' · 单条 MMA ' + S.cfg.m + '×' + S.N + '×' + R.K + '</div>' +
+      '<div class="note" data-testid="flow-status">PTX ISA 合法组合（单 CTA、稠密、SS）</div></div></div>' +
+      (R.fAlignNote ? '<div class="note">' + esc(R.fAlignNote) + '（alignment = ' + S.align + '）</div>' : '');
+    $('flow-notice').textContent = S.notice || '';
+    $('flow-notice').style.display = S.notice ? '' : 'none';
+  }
+  function renderRelTable() {
+    var T = MF.table(), c = S.cfg, h = '<div class="relgrid">';
+    h += '<div class="rh"></div>' + ['非 .ws', '.ws'].map(function (w) { return '<div class="rh span3">' + w + '</div>'; }).join('');
+    h += '<div class="rh"></div>' + [32, 64, 128, 32, 64, 128].map(function (m) { return '<div class="rh">M=' + m + '</div>'; }).join('');
+    MF.KIND_IDS.forEach(function (k) {
+      h += '<div class="rk">' + KIND_LABEL[k] + '<small>' + KIND_SUB[k] + ' · K=' + MF.kinds().filter(function (x) { return x.id === k; })[0].K + '</small></div>';
+      [false, true].forEach(function (ws) {
+        [32, 64, 128].forEach(function (m) {
+          var r = T.filter(function (x) { return x.kind === k && x.ws === ws && x.m === m; })[0];
+          var on = c.kind === k && c.ws === ws && c.m === m;
+          var why = r.ok ? '' : (k === 'mxf8f6f4' ? (ws ? '.ws 无效' : '只有 M=128') : (!ws && m === 32 ? 'M=32 仅 .ws' : '不支持'));
+          h += '<button class="rc' + (r.ok ? ' ok L' + r.layout : ' bad') + (on ? ' on' : '') + '" data-rel="' + k + '|' + ws + '|' + m + '" data-legal="' + (r.ok ? 1 : 0) + '" data-testid="rel-' + k + '-' + (ws ? 'ws' : 'nows') + '-' + m + '"' + (on ? ' aria-pressed="true"' : '') +
+            (r.ok ? '' : ' title="' + esc('不合法：' + r.reason + '（点击查看原因）') + '"') + '>' + (r.ok ? '<b>' + r.layout + '</b>' : '✕') + (r.ok ? '' : '<small>' + why + '</small>') + '</button>';
+        });
+      });
+    });
+    h += '</div>';
+    $('rel-table').innerHTML = h;
+    renderNSelect();
+    $('rel-feedback').innerHTML = S.relMsg ? '<div class="warn" data-testid="rel-reason">' + S.relMsg + '</div>' : '';
+    var relNote = '<p class="note">单 CTA、稠密、SM100：普通 FP8 与 BF16 的布局关系相同（非 .ws：M64→F、M128→D；.ws：M32→G、M64→E、M128→D）；FP8 block scale 只有非 .ws M128→D（.ws 一栏在 PTX Table 48 中为 Invalid）。K=64（f8f6f4/mxf8f6f4）只在 sm_107f 及以上，不属于 SM100，本页不收录。' +
+      ptxLink('tcgen05-matrix-shape', 'PTX Table 48') + ' · ' + ptxLink('tcgen05-data-path-layout-organization', 'PTX 布局表') + '</p>';
+    var R = resolveCur();
+    if (R.ok) {
+      var chk = MF.N_DEMO.concat([8, 24]).map(function (n) {
+        var x = MF.checkN(mcfg(), n); return '<span class="pill">N=' + n + '：ISA ' + (x.isa ? '✓' : '✕') + (x.cutlass == null ? '' : ' · CUTLASS ' + (x.cutlass ? '✓' : '✕')) + '</span>';
+      }).join('');
+      $('n-rules').innerHTML = relNote + '<h3>N 的合法范围（ISA 与 CUTLASS 封装分开）</h3><dl class="nkv">' +
+        '<dt>PTX ISA（Table 48）</dt><dd>' + esc(R.nRule.isa) + '</dd>' +
+        '<dt>CUTLASS 封装</dt><dd>' + esc(R.nRule.cutlass) + '</dd>' +
+        '<dt>本页图形</dt><dd>' + esc(R.nRule.demo) + '</dd></dl><div data-testid="n-checks">' + chk + '</div>';
+    }
+  }
+
+  /* ================= 主图：D 分区 ↔ 一条 MMA 的 SMEM A/B 片段 ↔ TMEM 区域 ================= */
+  var KSTEP = 0;   // 只观察 stage 内第一条 MMA 的 K 片段（FP8：K 0–31；BF16：K 0–15）
+  function partKey() { return [S.cfg.kind, S.cfg.ws, S.cfg.m, S.N, alignFor(S.layout), S.layout].join('|'); }
+  // 任何影响分区含义的参数变化（kind / .ws / M / N / F alignment / layout）都清空选中分区，等待手动重新选择
+  function validatePart() {
+    var key = partKey(), old = S.part.key;
+    if (old && key !== old) {
+      var a = old.split('|'), b = key.split('|'), names = ['kind', '.ws', 'M', 'N', 'F alignment', 'Layout'], ch = [];
+      for (var i = 0; i < names.length; i++) if (a[i] !== b[i]) ch.push(names[i]);
+      if (S.part.w != null) S.part.msg = '参数变化（' + ch.join('、') + '）：已清空分区选择，请重新点击一个分区。';
+      S.part.w = null; S.part.sel = null;
+    }
+    S.part.key = key;
+  }
+  function partSelect(w) { S.part.w = w; S.part.sel = 'part'; S.part.msg = ''; renderPart(); }
+  function partGeo() {
+    var W = Math.max(300, Math.round($('part-svg').getBoundingClientRect().width || 1000)), g = { W: W, narrow: W < 720 };
+    var M = S.cfg.m, N = S.N;
+    if (!g.narrow) {
+      var rs = Math.min(2.2, 300 / Math.max(M, N));
+      g.ax = 64; g.aw = Math.round(W * 0.22); g.ay = 84;
+      g.ah = Math.max(96, M * rs); g.by = g.ay + g.ah + 74; g.bh = Math.max(96, N * rs);   // 最小高度保证刻度可读
+      g.tcw = 120; g.tcx = g.ax + g.aw + Math.round(W * 0.09);
+      g.tx = g.tcx + g.tcw + Math.round(W * 0.09); g.tw = W - g.tx - 24; g.ty = 84; g.lh = 2.4;
+      g.calloutX = g.tx; g.calloutW = g.tw;
+      g.tcy = g.ay; g.tch = Math.max(g.by + g.bh, g.ty + 128 * g.lh) - g.ay;
+    } else {
+      var rs2 = Math.min(1.6, 220 / Math.max(M, N));
+      g.ax = 52; g.aw = W - 66; g.ay = 84; g.ah = Math.max(80, M * rs2); g.by = g.ay + g.ah + 70; g.bh = Math.max(80, N * rs2);
+      g.tcx = 24; g.tcw = W - 48; g.tcy = g.by + g.bh + 56; g.tch = 98;
+      g.tx = 52; g.tw = W - 66; g.ty = g.tcy + g.tch + 84; g.lh = 2;
+      g.calloutX = 24; g.calloutW = W - 32;
+    }
+    g.cy = g.ty + 128 * g.lh + 26;
+    return g;
+  }
+  function renderPart() {
+    validatePart();
+    var svg = $('part-svg'), st = $('part-status'), R = resolveCur();
+    if (!R.ok) { svg.innerHTML = ''; st.innerHTML = ''; return; }
+    var Pp = PM.partitions(mcfg(), S.N, alignFor(S.layout)), g = partGeo(), w = S.part.w;
+    var Ssel = w != null ? PM.select(mcfg(), S.N, alignFor(S.layout), w, KSTEP) : null;
+    var Kc = Pp.K, M = Pp.M, N = S.N, s = defs('p');
+    var col = w != null ? PM.COLORS[w] : '#7d879c';
+    var kx = function (kk) { return g.ax + kk / Kc * g.aw; };
+    var bs = R.kind.blockScale;
+    st.innerHTML = (S.part.msg ? '<div class="notice" data-testid="part-msg">' + esc(S.part.msg) + '</div>' : '') +
+      (w == null ? '<div class="prompt" data-testid="part-prompt">尚未选择分区：请在 <b>TMEM</b> 图或逻辑 D 小图中<b>点击一个分区</b>（Layout ' + Pp.layout + '，' + nt(LM.getLayout(Pp.layout)) + '）。</div>'
+        : '<div class="partsum" data-testid="part-summary" style="border-color:' + col + '"><b style="color:' + col + '">W' + w + '</b>：D[m ' + rng(Ssel.D.mRange) + ', n ' + rng(Ssel.D.nRange) + '] ← SMEM A[m ' + rng(Ssel.A.rows) + ', k ' + rng(Ssel.A.kRange) + '] · SMEM B[n ' + rng(Ssel.B.rows) + ', k ' + rng(Ssel.B.kRange) + '] → TMEM lanes ' + rng(Ssel.tmem.lanes) + '、columns ' + rng(Ssel.tmem.columns) + '</div>');
+
+    // ---- A / B 观察窗口：一条 MMA 的 K 片段（K-major，横轴 K）
+    function operand(name, y, h, rows, selRows) {
+      var o = '<g class="ptile"' + act({ pact: 'tile', op: name }) + ' data-testid="part-' + name + '">';
+      var full = 'SMEM ' + name + '：' + (name === 'A' ? 'M×K = ' : 'N×K = ') + rows + '×' + Kc + '（stage 实为 ' + rows + '×' + PM.BK + '）', short = 'SMEM ' + name + '：' + rows + '×' + Kc + '（K-major）';
+      var tx0 = g.narrow ? 8 : g.ax, avail = g.narrow ? g.W - 16 : g.tcx - g.ax - 60;
+      o += text(tx0, y - 30, estW(full, 14, true) <= avail ? full : short, 'class="vt" style="font-size:14px"');
+      o += rect(g.ax, y, g.aw, h, 'class="pbg"');
+      if (selRows) {
+        var ry = y + selRows[0] / rows * h, rh = (selRows[1] - selRows[0] + 1) / rows * h;
+        o += rect(g.ax, ry, g.aw, rh, 'style="fill:' + col + ';fill-opacity:.9;stroke:#1f2a44;stroke-width:1.2;pointer-events:none" data-testid="part-' + name + '-hl" data-rows="' + rng(selRows) + '" data-k="' + rng([0, Kc - 1]) + '"');
+      }
+      o += rect(g.ax, y, g.aw, h, 'class="pframe"');
+      [0, Kc / 2, Kc].forEach(function (t) { o += text(kx(t), y - 8, t === Kc ? Kc - 1 : t, 'text-anchor="middle" class="ptick"'); });
+      o += text(g.narrow ? g.ax - 30 : g.ax + g.aw + 18, y - 8, g.narrow ? 'K→' : 'K', 'class="ptick" style="font-weight:700"');
+      var marks = h >= 150 ? [0, rows / 4, rows / 2, 3 * rows / 4] : [0, rows / 2];
+      marks.forEach(function (mv) { o += text(g.ax - 6, y + mv / rows * h + 10, mv, 'text-anchor="end" class="ptick"'); });
+      o += text(g.ax - 6, y + h, rows - 1, 'text-anchor="end" class="ptick"');
+      if (!g.narrow) o += text(g.ax - 46, y + h / 2 + 4, name === 'A' ? 'M' : 'N', 'class="ptick" style="font-weight:700"');
+      return o + '</g>';
+    }
+    s += operand('A', g.ay, g.ah, M, Ssel ? Ssel.A.rows : null);
+    s += operand('B', g.by, g.bh, N, Ssel ? Ssel.B.rows : null);
+    // ---- TC 黑盒
+    s += '<g class="ptc" data-testid="part-tc">' + rect(g.tcx, g.tcy, g.tcw, g.tch, 'rx="12" style="fill:#1f2430;stroke:#000"');
+    var tl = ['Tensor Core', '（黑盒）', 'MMA ' + M + '×' + N + '×' + Kc, '整条 tile 一次计算', bs ? '+ SFA/SFB scale' : ''];
+    var ty0 = g.tcy + g.tch / 2 - (tl.length * 17) / 2 + 12;
+    tl.forEach(function (t, i) { if (t) s += text(g.tcx + g.tcw / 2, ty0 + i * 17, esc(t), 'text-anchor="middle" style="font-size:' + (i === 0 ? 14 : 12) + 'px;font-weight:' + (i < 2 ? 800 : 400) + ';fill:' + (i === 4 ? '#ffb36b' : (i < 2 ? '#fff' : '#cfd5e2')) + '"'); });
+    s += '</g>';
+    // ---- TMEM 物理：128 lanes × columns（按 N 列刻度）
+    var colW = g.tw / N, span = Pp.columnSpan, lyf = function (l) { return g.ty + l * g.lh; };
+    var thFull = 'TMEM D（物理）：128 lanes × 结果占用列 0–' + (span - 1), thShort = 'TMEM D：128 lanes × 列 0–' + (span - 1);
+    var thX = g.narrow ? 24 : g.tx - 40, thAvail = g.W - thX - 8;
+    s += text(thX, g.ty - (g.narrow ? 40 : 30), estW(thFull, 14, true) <= thAvail ? thFull : (estW(thShort, 14, true) <= thAvail ? thShort : 'TMEM D（128 lanes）'), 'class="vt" style="font-size:14px"');
+    s += rect(g.tx, g.ty, g.tw, 128 * g.lh, 'style="fill:#fff;stroke:#b5bdcc;pointer-events:none"');
+    if (span < N) {
+      var gx = g.tx + span * colW, gw = g.tw - span * colW;
+      s += rect(gx, g.ty, gw, 128 * g.lh, 'class="tm-unocc" fill="#f3f4f7" stroke="#b5bdcc" stroke-dasharray="5 4" data-testid="part-cmp-frame"');
+      var gl = wrapText('按 N=' + N + ' 列刻度的对照框：不是结果列，也不是分配', gw - 12, 11.5);
+      if (gw >= 60) gl.slice(0, 4).forEach(function (t, i) { s += text(gx + 6, g.ty + 18 + i * 15, esc(t), 'class="ptick" style="fill:#6b7385;pointer-events:none"'); });
+    }
+    Pp.parts.forEach(function (p) {
+      var on = w === p.warp, x = g.tx + p.tmem.columns[0] * colW, ww = (p.tmem.columns[1] - p.tmem.columns[0] + 1) * colW, y = lyf(p.tmem.lanes[0]), hh = (p.tmem.lanes[1] - p.tmem.lanes[0] + 1) * g.lh;
+      if (p.tmem.unusedLanes) s += rect(g.tx, lyf(p.tmem.unusedLanes[0]), span * colW, 16 * g.lh, 'fill="url(#pun)" style="pointer-events:none" data-testid="part-unused-W' + p.warp + '"');
+      s += '<g class="ppart"' + act({ pact: 'part', w: p.warp }) + ' data-testid="part-region-W' + p.warp + '" data-lanes="' + rng(p.tmem.lanes) + '" data-cols="' + rng(p.tmem.columns) + '">' +
+        rect(x, y, ww, hh, 'style="fill:' + p.color + ';fill-opacity:' + (on ? .9 : .35) + ';stroke:' + (on ? '#1f2a44' : '#fff') + ';stroke-width:' + (on ? 2.5 : 1.5) + '"' + (on ? ' data-testid="part-tmem-hl"' : '')) +
+        text(x + 8, y + Math.min(hh / 2 + 5, 20), 'W' + p.warp + (on ? ' ✓' : ''), 'class="plabel"') + '</g>';
+    });
+    for (var lg = 0; lg <= 128; lg += 32) s += text(g.tx - 6, lyf(lg) + (lg === 128 ? 0 : 10), lg === 128 ? 127 : lg, 'text-anchor="end" class="ptick"');
+    s += text(g.tx, g.ty - 8, 'col 0', 'class="ptick"');
+    var endLab = 'col ' + (span - 1), endX = g.tx + span * colW;
+    s += text(Math.min(endX, g.tx + g.tw - estW(endLab, 11.5, true) / 2 - 2), g.ty - 8, endLab, 'text-anchor="' + (span < N ? 'middle' : 'end') + '" class="ptick" style="font-weight:700"');
+    // ---- 选中分区的组合说明（放在 TMEM 框下方，不遮挡分区内的 W 标签）
+    var cy = g.cy;
+    if (Ssel) {
+      var cl = wrapText('W' + w + '：lanes ' + rng(Ssel.tmem.lanes) + ' · columns ' + rng(Ssel.tmem.columns) + '（物理）↔ D[m ' + rng(Ssel.D.mRange) + ', n ' + rng(Ssel.D.nRange) + ']（逻辑）', g.calloutW - 14, 12.5);
+      s += '<g data-testid="part-callout">' + rect(g.calloutX, cy - 14, 5, cl.length * 17 + 2, 'style="fill:' + col + '"');
+      cl.forEach(function (t, i) { s += text(g.calloutX + 10, cy + i * 17, esc(t), 'class="pmark" style="font-size:12.5px"'); });
+      s += '</g>';
+      cy += cl.length * 17 + 14;
+    } else cy += 4;
+    // ---- 逻辑 D（辅助小图）
+    var dx = g.tx, dw = Math.min(g.tw, g.narrow ? g.tw : 240), dy = cy + 18, dh = Math.max(40, Math.min(120, dw * M / N));
+    s += text(dx, dy - 8, '逻辑 D ' + M + '×' + N + '（辅助）', 'class="ptick" style="font-weight:700"');
+    Pp.parts.forEach(function (p) {
+      var on = w === p.warp, x = dx + p.D.nRange[0] / N * dw, y = dy + p.D.mRange[0] / M * dh, ww = p.D.shape[1] / N * dw, hh = p.D.shape[0] / M * dh;
+      s += '<g class="ppart"' + act({ pact: 'part', w: p.warp }) + ' data-testid="part-dlog-W' + p.warp + '">' +
+        rect(x, y, ww, hh, 'style="fill:' + p.color + ';fill-opacity:' + (on ? .9 : .35) + ';stroke:' + (on ? '#1f2a44' : '#fff') + ';stroke-width:' + (on ? 2.5 : 1.2) + '"') +
+        (hh >= 14 && ww >= 22 ? text(x + ww / 2, y + hh / 2 + 4, 'W' + p.warp, 'text-anchor="middle" class="plabel"') : '') + '</g>';
+    });
+    var H = Math.max(g.by + g.bh, dy + dh, g.tcy + g.tch) + 36;
+    // ---- 连线（同一分区颜色）：A、B 各自从选中矩形出发到 TC；D 从 TC 到选中的 TMEM 区域
+    function pedge(id, d, lx, ly, label, anchor) {
+      var on = S.part.sel === 'e' + id;
+      return '<g class="pedge' + (on ? ' sel' : '') + '"' + act({ pact: 'edge', id: id }) + ' data-testid="part-edge-' + id + '"><path class="hit" d="' + d + '"/><path class="vis" d="' + d + '" style="stroke:' + col + '" marker-end="url(#pahc)"/></g>' +
+        text(lx, ly, label, 'text-anchor="' + (anchor || 'middle') + '" class="flbl"');
+    }
+    function leader(x1, y, x2) { return line(x1, y, x2, y, 'stroke="' + col + '" stroke-width="1.5" stroke-dasharray="3 3" style="pointer-events:none"'); }
+    s += '<defs><marker id="pahc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="' + col + '"/></marker></defs>';
+    var aRowY = Ssel ? g.ay + (Ssel.A.rows[0] + Ssel.A.rows[1] + 1) / 2 / M * g.ah : g.ay + g.ah / 2;
+    var bRowY = Ssel ? g.by + (Ssel.B.rows[0] + Ssel.B.rows[1] + 1) / 2 / N * g.bh : g.by + g.bh / 2;
+    var tcMid = g.tcy + g.tch / 2;
+    var dTgtX = g.tx + (Ssel ? Ssel.tmem.columns[0] * colW : 0), dTgtY = Ssel ? lyf((Ssel.tmem.lanes[0] + Ssel.tmem.lanes[1] + 1) / 2) : g.ty + 64 * g.lh;
+    if (!g.narrow) {
+      var ex = g.ax + g.aw + 6;
+      if (Ssel) s += leader(g.ax + g.aw, aRowY, ex) + leader(g.ax + g.aw, bRowY, ex);
+      s += pedge('A', 'M' + r1(ex) + ' ' + r1(aRowY) + ' C' + r1(g.tcx - 30) + ' ' + r1(aRowY) + ' ' + r1(g.tcx - 40) + ' ' + r1(tcMid - 30) + ' ' + r1(g.tcx + 1) + ' ' + r1(tcMid - 30), (ex + g.tcx) / 2, Math.min(aRowY, tcMid - 30) - 8, 'A');
+      s += pedge('B', 'M' + r1(ex) + ' ' + r1(bRowY) + ' C' + r1(g.tcx - 30) + ' ' + r1(bRowY) + ' ' + r1(g.tcx - 40) + ' ' + r1(tcMid + 30) + ' ' + r1(g.tcx + 1) + ' ' + r1(tcMid + 30), (ex + g.tcx) / 2, Math.max(bRowY, tcMid + 30) + 18, 'B');
+      s += pedge('D', 'M' + r1(g.tcx + g.tcw) + ' ' + r1(tcMid) + ' C' + r1(g.tx - 40) + ' ' + r1(tcMid) + ' ' + r1(g.tx - 50) + ' ' + r1(dTgtY) + ' ' + r1(dTgtX + 2) + ' ' + r1(dTgtY), (g.tcx + g.tcw + g.tx) / 2 - 16, Math.min(tcMid, dTgtY) - 10, '写 D');
+    } else {
+      var ex2 = g.ax + g.aw + 2, bx2 = g.ax - 2;
+      if (Ssel) s += leader(g.ax + g.aw, aRowY, ex2) + leader(g.ax, bRowY, bx2);
+      // A 沿右侧边距、B 沿左侧边距各自到 TC（两条独立输入）；D 沿左侧边距绕到选中分区左边缘（所有分区物理列都从 0 开始）
+      s += pedge('A', 'M' + r1(ex2) + ' ' + r1(aRowY) + ' C' + r1(g.W - 6) + ' ' + r1(aRowY) + ' ' + r1(g.W - 6) + ' ' + r1(g.tcy - 40) + ' ' + r1(g.W - 44) + ' ' + r1(g.tcy + 1), g.W - 16, (aRowY + g.tcy) / 2, 'A', 'end');
+      s += pedge('B', 'M' + r1(bx2) + ' ' + r1(bRowY) + ' C' + r1(8) + ' ' + r1(bRowY) + ' ' + r1(8) + ' ' + r1(g.tcy - 40) + ' ' + r1(44) + ' ' + r1(g.tcy + 1), 16, Math.max(bRowY + 20, g.by + g.bh + 30), 'B', 'start');
+      s += pedge('D', 'M' + r1(44) + ' ' + r1(g.tcy + g.tch - 1) + ' Q' + r1(8) + ' ' + r1(g.tcy + g.tch + 6) + ' ' + r1(8) + ' ' + r1(g.tcy + g.tch + 30) + ' L' + r1(8) + ' ' + r1(dTgtY - 14) + ' Q' + r1(8) + ' ' + r1(dTgtY) + ' ' + r1(dTgtX + 2) + ' ' + r1(dTgtY), 52, g.tcy + g.tch + 18, '写 D', 'start');
+    }
+    svg.setAttribute('viewBox', '0 0 ' + g.W + ' ' + r1(H));
+    svg.setAttribute('data-layout', Pp.layout);
+    svg.setAttribute('data-selected', w == null ? '' : w);
+    svg.setAttribute('data-k', rng([0, Kc - 1]));
+    svg.setAttribute('data-narrow', g.narrow ? 1 : 0);
+    svg.innerHTML = s;
+    $('part-note').innerHTML = (span < N ? '灰色虚框只是按 N=' + N + ' 的列刻度画出的<b>对照框</b>：Layout ' + Pp.layout + ' 的结果只占列 0–' + (span - 1) + '；虚框<b>不是额外的结果列</b>，也<b>不表示 tcgen05.alloc 分配了这些列</b>（结果占用列与实际分配列数是两回事，后者 ≥32 列且为 2 的幂）。' : '');
+    renderPartDetail(Ssel);
+  }
+
+  function tileLogicalSvg(Ssel, op) {
+    var rows = op === 'A' ? Ssel.A.tileRows : Ssel.B.tileRows, sel = op === 'A' ? Ssel.A.rows : Ssel.B.rows, kr = Ssel.A.kRange;
+    var W = 320, H = Math.max(60, Math.min(180, rows)), s = '', col = Ssel.color, x0 = 30, ww = W - 40;
+    s += rect(x0, 14, ww, H, 'style="fill:#f0f2f6;stroke:#8a93a6;stroke-dasharray:4 3"');
+    s += rect(x0, 14, (kr[1] + 1) / PM.BK * ww, H, 'style="fill:#ffe9a8;stroke:#8a6200"');
+    s += rect(x0, 14 + sel[0] / rows * H, (kr[1] - kr[0] + 1) / PM.BK * ww, (sel[1] - sel[0] + 1) / rows * H, 'style="fill:' + col + ';stroke:#1f2a44"');
+    s += text(x0, 10, 'k 0', 'class="ptick"') + text(x0 + (kr[1] + 1) / PM.BK * ww, 10, kr[1], 'text-anchor="middle" class="ptick" style="font-weight:700"') + text(W - 10, 10, '127', 'text-anchor="end" class="ptick"');
+    s += text(26, 24, '0', 'text-anchor="end" class="ptick"') + text(26, 14 + H, rows - 1, 'text-anchor="end" class="ptick"');
+    return '<svg width="' + W + '" viewBox="0 0 ' + W + ' ' + (H + 24) + '" data-testid="part-logical-' + op + '">' + s + '</svg>';
+  }
+  function tilePhysSvg(V, col) {
+    var nCh = V.atoms * 8, cw = Math.min(44, 520 / nCh), rh = 22, ox = 46, oy = 34, s = '';
+    for (var a = 0; a < V.atoms; a++) s += text(ox + a * 8 * cw + 4 * cw, 12, 'atom ' + a + '（128 B）', 'text-anchor="middle" class="ptick" style="font-weight:700"');
+    for (var c = 0; c < nCh; c++) s += text(ox + c * cw + cw / 2, 28, c % 8, 'text-anchor="middle" class="ptick"');
+    V.sampleRows.forEach(function (r, i) {
+      s += text(ox - 6, oy + i * rh + 15, 'r' + r.row, 'text-anchor="end" class="ptick"');
+      for (var c2 = 0; c2 < nCh; c2++) s += rect(ox + c2 * cw, oy + i * rh, cw - 2, rh - 2, 'style="fill:#f3f4f7;stroke:#d5d9e3"');
+      r.chunks.forEach(function (ch) {
+        var x = ox + (V.atom * 8 + ch.physChunk) * cw;
+        s += '<g data-testid="part-phys-cell"><title>逻辑块 ' + ch.logicalChunk + ' → 物理块 ' + ch.physChunk + '，偏移 ' + ch.offset + '，bank ' + ch.banks[0] + '–' + ch.banks[1] + '</title>' +
+          rect(x, oy + i * rh, cw - 2, rh - 2, 'style="fill:' + col + ';stroke:#1f2a44"') + text(x + cw / 2 - 1, oy + i * rh + 15, ch.logicalChunk, 'text-anchor="middle" style="font-size:11px;font-weight:700;fill:#fff"') + '</g>';
+      });
+    });
+    var H = oy + V.sampleRows.length * rh + 6, W = ox + nCh * cw + 8;
+    return '<svg width="' + W + '" viewBox="0 0 ' + W + ' ' + H + '" data-testid="part-phys-svg">' + s + '</svg>';
+  }
+  function renderPartDetail(Ssel) {
+    var el = $('part-detail'), sel = S.part.sel, h = '';
+    if (!Ssel) {
+      el.innerHTML = '<p class="note">' + (sel === 'tileA' || sel === 'tileB' ? '请先选中一个 D 分区，才能确定 A/B 需要哪些行。' : '点击一个分区后，这里显示它对应的 A/B 行区间、TMEM 区域与说明；点击 A/B tile 显示 SMEM 物理排布与两种 descriptor。') + '</p>';
+      el.setAttribute('data-sel', sel || ''); return;
+    }
+    var R = resolveCur(), w = Ssel.warp, lay = Ssel.layout;
+    var layLink = ptxLink('tcgen05-data-path-layout-' + lay.toLowerCase(), 'PTX Layout ' + lay) + ' · ' + ptxLink('tcgen05-mma-instructions-mma', 'tcgen05.mma') + ' · ' + ptxLink('tcgen05-instructions-tcgen05-ld', 'tcgen05.ld');
+    if (sel === 'part' || sel === 'eD' || !sel) {
+      var me = LM.mapElement(lay, Ssel.D.mRange[0], Ssel.D.nRange[0], S.N, alignFor(lay));
+      // 32x32b.x8 的线程映射只对 Layout D 核实过（DeepGEMM 示例 epilogue 用的就是它），与 kind 无关；其他布局只给访问 warp
+      var ldHtml = lay === 'D'
+        ? 'Layout D 的已核实读法（DeepGEMM 示例 ' + fileLink('storeCd', 'sm100_store_cd.cuh:120') + '）：访问 warp W' + w + ' 用 tcgen05.ld.sync.aligned.32x32b.x8 读回本分区，线程 t 读 lane ' + (32 * w) + '+t，每条 x8 取 8 个连续列的 FP32，读完执行 tcgen05.wait::ld。'
+        : '本分区由访问 warp W' + w + '（W = ⌊lane/32⌋）通过 tcgen05.ld 读回；线程/寄存器的具体映射取决于所选 ld 形状，本页不伪造。';
+      h = '<h4 style="color:' + Ssel.color + '">' + (sel === 'eD' ? '连线：TC → TMEM D · ' : '') + '分区 W' + w + ' · Layout ' + lay + '（' + nt(LM.getLayout(lay)) + '）</h4>' + kv([
+        ['指令', esc(R.instr.split('\n')[0]) + ' · 单条 MMA ' + Ssel.mma.shape],
+        ['D 分区（逻辑）', 'm ' + rng(Ssel.D.mRange) + ' × n ' + rng(Ssel.D.nRange) + '（' + Ssel.D.shape.join('×') + '）'],
+        ['SMEM A 需要', '行 m ' + rng(Ssel.A.rows) + '，K ' + rng(Ssel.A.kRange)],
+        ['SMEM B 需要', '行 n ' + rng(Ssel.B.rows) + '，K ' + rng(Ssel.B.kRange) + '（B 以 N×K 画，行轴是原 N）'],
+        ['TMEM 区域', 'lanes ' + rng(Ssel.tmem.lanes) + '，columns ' + rng(Ssel.tmem.columns) + '（相对基址，FP32 单 atom）' + (Ssel.tmem.unusedLanes ? '；lanes ' + rng(Ssel.tmem.unusedLanes) + ' 不用' : '')],
+        ['K 片段', esc(Ssel.stepNote)],
+        ['计算含义', esc(Ssel.accumulate)],
+        ['观察窗口', esc(Ssel.window)],
+        ['TMEM → 寄存器', ldHtml + (me.ok ? '<br>例：D[' + me.m + ',' + me.n + '] → lane ' + me.tmem.lane + ', col ' + me.tmem.column : '')]
+      ].concat(Ssel.scale ? [['scale（附加输入）', esc(Ssel.scale.note)]] : [])) + '<div class="links">官方：' + layLink + '</div>';
+    } else {
+      var op = sel.slice(-1), V = PM.smemView(mcfg(), S.N, alignFor(lay), w, KSTEP, op);
+      var flds = function (list) { return '<table class="desc"><tr><th>字段</th><th>值</th><th>来源 / 说明</th></tr>' + list.map(function (f) { return '<tr><td>' + esc(f[0]) + '</td><td><code>' + esc(f[1]) + '</code></td><td>' + esc(f[2]) + '</td></tr>'; }).join('') + '</table>'; };
+      h = '<h4 style="color:' + Ssel.color + '">' + (sel[0] === 'e' ? '连线：SMEM ' + op + ' → TC · ' : '') + 'SMEM ' + op + ' · 窗口 ' + V.rows + '×' + Ssel.mma.K + '（stage ' + V.rows + '×' + PM.BK + '）· 分区 W' + w + '</h4>' +
+        (sel[0] === 'e' ? '<p>这条 MMA 读取整个 ' + op + ' 的 ' + V.rows + '×' + Ssel.mma.K + ' 片段（' + V.rows + ' 行 × K ' + rng(V.kRange) + '），选中分区只用到其中行 ' + rng(V.rowRange) + '；读取由 MMA 本身完成（单线程发起），不是某个线程逐元素搬运。</p>' : '') +
+        '<p class="note" data-testid="part-stage-note">' + esc(Ssel.fragment.stageNote) + '：每行 ' + PM.BK + '×' + V.eb + ' B = ' + (PM.BK * V.eb) + ' B，按 128 B swizzle atom 存放' + (V.atoms > 1 ? '，K 方向共 ' + V.atoms + ' 个 atom（atom i 在 i·' + V.rows + '·128 B 处）' : '') + '。</p>' +
+        '<div class="pdual"><div><div class="ztitle">逻辑视图：' + op + '[' + (op === 'A' ? 'm' : 'n') + ' ' + rng(V.rowRange) + ', k ' + rng(V.kRange) + ']（黄 = 本 MMA 窗口，虚框 = 整个 stage）</div>' + tileLogicalSvg(Ssel, op) +
+        '<p class="note">' + esc(V.tileNote) + '</p></div>' +
+        '<div><div class="ztitle">SMEM 物理视图：所选行的前 8 行（一个 swizzle 周期）· 数字 = 逻辑 16 B 块号</div>' + tilePhysSvg(V, Ssel.color) +
+        '<p class="note">' + esc(V.formula) + '。本 MMA 每行读 ' + (V.kBytes[1] - V.kBytes[0] + 1) + ' B = 逻辑块 ' + V.logicalChunks.join('–') + '（atom ' + V.atom + '）；灰格是同一 stage 中其余 K 字节（不在本窗口内）。例：行 ' + V.sampleRows[0].row + ' 逻辑块 ' + V.sampleRows[0].chunks[0].logicalChunk + ' → 物理块 ' + V.sampleRows[0].chunks[0].physChunk + '，偏移 ' + V.sampleRows[0].chunks[0].offset + '，bank ' + V.sampleRows[0].chunks[0].banks.join('–') + '。</p></div></div>' +
+        '<div class="pdual"><div data-testid="part-umma-desc"><div class="ztitle">MMA 用：UMMA SMEM descriptor</div><p class="note">' + esc(V.umma.what) + '</p>' + flds(V.umma.fields) + '<p class="note">' + esc(V.umma.note) + '</p></div>' +
+        '<div data-testid="part-tma-desc"><div class="ztitle">搬运用：TMA descriptor（tensor map）</div><p class="note">' + esc(V.tma.what) + '</p>' + flds(V.tma.fields) + '<p class="note">' + esc(V.tma.note) + '</p></div></div>' +
+        '<div class="links">源码：' + fileLink('mmaDesc', 'mma/sm100.cuh（make_smem_desc / make_umma_desc）') + ' · ' + fileLink('tmaCopy', 'common/tma_copy.cuh（atom 放置）') + ' · ' + fileLink('kernel', 'sm100_fp8_fp4_gemm_1d1d.cuh') +
+        '<br>官方：' + ptxLink('tcgen05-matrix-descriptors', 'PTX matrix descriptors') + ' · ' + ptxLink('tcgen05-mma-instructions-mma', 'tcgen05.mma') + '</div>';
+    }
+    el.innerHTML = h;
+    el.setAttribute('data-sel', sel || 'part');
+  }
+  function renderMma() { renderRelTable(); renderAlign(); renderResult(); renderPart(); }
+
+  /* ================= ⑤ DeepGEMM 小 M（与 ⓪ 的选择无关） ================= */
+  function renderSmallM() {
+    fseg('seg-sm', LM.SMALL_M_CASES.map(function (m) { return { v: m, label: String(m), on: S.sm === m }; }), 'smallm-btn-');
+    var r = LM.smallM(S.sm), narrow = $('sm-svg').parentNode.clientWidth < 700;
+    $('sm-chips').innerHTML =
+      '<div class="chip c1" data-testid="sm-valid"><div class="v">' + r.validRows + '</div><div class="k">有效行（workload M）</div></div>' +
+      '<div class="chip c2" data-testid="sm-extracted"><div class="v">' + r.extractedRows + '</div><div class="k">取出行（BLOCK_M=' + r.blockM + '）</div></div>' +
+      '<div class="chip c3" data-testid="sm-mma"><div class="v">' + r.mmaRows + '</div><div class="k">MMA 行（UMMA_M）</div></div>' +
+      '<div class="chip c4" data-testid="sm-warps"><div class="v">' + r.writebackWarps + '</div><div class="k">写回 warp（' + r.storeThreads + ' 线程）</div></div>' +
+      '<div class="chip" data-testid="sm-layout"><div class="v">D</div><div class="k">布局 4×1（不随 M 变）</div></div>';
+    var VW = narrow ? 620 : 1200, rh = 2.6, Y = 70, s = defs('s');
+    var ax = narrow ? 20 : 60, aw = narrow ? 120 : 180, bx = narrow ? 210 : 470, bw = narrow ? 200 : 320, cx = narrow ? 470 : 960, cw = narrow ? 140 : 200;
+    s += text(ax, 26, 'SMEM A stage', 'class="vt"') + text(ax, 44, '分配 BM=' + r.blockM + ' 行（非 128）', 'class="vs"');
+    s += rect(ax, Y, aw, r.blockM * rh, 'fill="#cfe0fb" stroke="#2f6fd0"');
+    s += rect(ax, Y, aw, r.validRows * rh, 'fill="#e5243b"');
+    if (r.tmaOOBRows > 0) s += rect(ax, Y + r.validRows * rh, aw, r.tmaOOBRows * rh, 'fill="url(#sgr)" stroke="#2f6fd0"') +
+      text(ax + aw / 2, Y + (r.validRows + r.tmaOOBRows / 2) * rh + 4, 'TMA 越界填充', 'text-anchor="middle" class="vs" style="fill:#1d3f86"');
+    if (r.blockM < 128) {
+      s += rect(ax, Y + r.blockM * rh, aw, (128 - r.blockM) * rh, 'fill="none" stroke="#8a93a6" stroke-dasharray="5 4"');
+      s += text(ax + aw / 2, Y + (r.blockM + (128 - r.blockM) / 2) * rh - 6, 'MMA 读取范围', 'text-anchor="middle" class="vs"');
+      s += text(ax + aw / 2, Y + (r.blockM + (128 - r.blockM) / 2) * rh + 10, '可能落入后续 A/B 缓冲', 'text-anchor="middle" class="vs"');
+      s += text(ax + aw / 2, Y + (r.blockM + (128 - r.blockM) / 2) * rh + 26, '（非显式补零）', 'text-anchor="middle" class="vs"');
+    }
+    s += text(bx, 26, 'TMEM 累加器 · UMMA_M=128 · Layout D', 'class="vt"') + text(bx, 44, '每 32 行 = 一个 lane 组 = 一个 W', 'class="vs"');
+    for (var w = 0; w < 4; w++) {
+      var y = Y + w * 32 * rh, h = 32 * rh, m0 = w * 32;
+      var ext = Math.max(0, Math.min(32, r.extractedRows - m0)), val = Math.max(0, Math.min(32, r.validRows - m0));
+      s += rect(bx, y, bw, h, 'fill="url(#sgr)" stroke="#fff" stroke-width="1.5"');
+      if (ext > 0) s += rect(bx, y, bw, ext * rh, 'fill="' + WL[w] + '" stroke="' + WC[w] + '"');
+      if (val > 0) s += rect(bx, y, bw, Math.max(val * rh, 2), 'fill="#e5243b"');
+      s += text(bx + 8, y + h / 2 + 4, 'lane ' + m0 + '–' + (m0 + 31) + (ext ? '' : ' · 计算但本 tile 不写回'), 'class="lbl" style="font-weight:600;paint-order:stroke;stroke:#fff;stroke-width:3px"');
+    }
+    var bxr = bx + bw + 8;
+    function brace(y0, y1, label, color, dx) {
+      return '<path d="M' + (bxr + dx) + ' ' + y0 + ' h6 V' + y1 + ' h-6" fill="none" stroke="' + color + '" stroke-width="2"/>' +
+        text(bxr + dx + 10, (y0 + y1) / 2 + 4, label, 'style="font-size:12px;font-weight:700;fill:' + color + '"');
+    }
+    s += brace(Y, Y + Math.max(r.validRows * rh, 3), r.validRows + ' 有效', '#e5243b', 0);
+    s += brace(Y, Y + r.extractedRows * rh, r.extractedRows + ' 取出', '#2f6fd0', narrow ? 0 : 64);
+    s += brace(Y, Y + 128 * rh, '128 MMA', '#5d6678', narrow ? 0 : 130);
+    s += text(cx, 26, '写回 warp', 'class="vt"') + text(cx, 44, 'CTA warp 4…7 = W0…W3', 'class="vs"');
+    for (w = 0; w < 4; w++) {
+      var on = w < r.writebackWarps, wy = Y + w * 32 * rh + 10, wh = 32 * rh - 20;
+      s += '<g data-testid="sm-warp-' + w + '" data-active="' + (on ? 1 : 0) + '">' +
+        rect(cx, wy, cw, wh, 'rx="8" fill="' + (on ? WL[w] : '#f4f5f8') + '" stroke="' + (on ? WC[w] : '#b9bfcc') + '" stroke-width="2"' + (on ? '' : ' stroke-dasharray="5 4"')) +
+        text(cx + 10, wy + wh / 2 - 2, 'W' + w + ' · CTA warp ' + (4 + w), 'style="font-weight:700;font-size:12.5px;fill:' + (on ? WC[w] : '#7d8596') + '"') +
+        text(cx + 10, wy + wh / 2 + 14, on ? '32 线程 · 32x32b.x8' : '本 tile 未启用', 'class="vs"') + '</g>';
+      if (on && !narrow) s += line(bx + bw + 200, Y + w * 32 * rh + 16 * rh, cx - 8, Y + w * 32 * rh + 16 * rh, 'stroke="' + WC[w] + '" stroke-width="2" marker-end="url(#sah)"');
+    }
+    var VH = Y + 128 * rh + 40;
+    s += text(narrow ? 20 : 60, VH - 12, 'workload M=' + r.workloadM + ' → BLOCK_M=' + r.blockM + ' → UMMA_M=128（Layout D）：写回 ' + r.writebackWarps + ' 个 warp；未写回 MMA 行比例 ≠ 时间/能耗损失比例', 'class="lbl"');
+    var svg = $('sm-svg');
+    svg.setAttribute('viewBox', '0 0 ' + VW + ' ' + VH);
+    svg.setAttribute('data-workload-m', r.workloadM);
+    svg.innerHTML = s;
+  }
+
+  function renderAll() { renderMma(); renderSmallM(); }
+
+  function bind() {
+    // kind / 形式 / M 的唯一入口是关系表（见下方 rel-table 监听）
+    $('mma-n-select').addEventListener('change', function (e) { setN(e.target.value); });
+    $('seg-falign').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { S.align = +b.getAttribute('data-v'); renderMma(); } });
+    $('rel-table').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-rel]'); if (!b) return;
+      var p = b.getAttribute('data-rel').split('|'), kind = p[0], ws = p[1] === 'true', m = +p[2];
+      if (b.getAttribute('data-legal') !== '1') {
+        S.relMsg = '<b>' + KIND_LABEL[kind] + ' · ' + (ws ? '.ws' : '非 .ws') + ' · M=' + m + ' 不合法：</b>' + esc(MF.legality(kind, ws, m).reason) + '。当前选择保持不变。';
+        renderRelTable(); return;
+      }
+      setCfg({ kind: kind, ws: ws, m: m });
+    });
+    function onAct(e) {
+      var t = e.target.closest('[data-pact]'); if (!t) return;
+      var a = t.getAttribute('data-pact');
+      if (a === 'part') { partSelect(+t.getAttribute('data-w')); return; }
+      if (a === 'tile') S.part.sel = 'tile' + t.getAttribute('data-op');
+      if (a === 'edge') S.part.sel = 'e' + t.getAttribute('data-id');
+      renderPart();
+    }
+    $('part-svg').addEventListener('click', onAct);
+    $('part-svg').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAct(e); } });
+    $('part-clear').addEventListener('click', function () { S.part.w = null; S.part.sel = null; S.part.msg = ''; renderPart(); });
+    $('seg-sm').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { S.sm = +b.getAttribute('data-v'); renderSmallM(); } });
+    var rt = null, lastW = window.innerWidth;
+    window.addEventListener('resize', function () {
+      clearTimeout(rt);
+      rt = setTimeout(function () { if (window.innerWidth !== lastW) { lastW = window.innerWidth; renderAll(); } }, 120);
+    });
+  }
+
+  window.TMEMPage = {
+    state: function () { return JSON.parse(JSON.stringify({ cfg: S.cfg, N: S.N, align: S.align, layout: S.layout, part: { w: S.part.w, sel: S.part.sel, msg: S.part.msg }, sm: S.sm })); },
+    setFlow: function (patch) { return setCfg(patch || {}); },
+    setN: function (n) { return setN(n); },
+    setAlign: function (a) { if (a !== 0 && a !== 16) return false; S.align = a; renderMma(); return true; },
+    selectPartition: function (w) { partSelect(w); return JSON.parse(JSON.stringify({ w: S.part.w })); },
+    rerender: renderAll
+  };
+  bind();
+  renderAll();
+})();
+
+</script>
+</body>
+</html>
