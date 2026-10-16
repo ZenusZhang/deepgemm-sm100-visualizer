@@ -333,6 +333,27 @@ table.dt th{width:190px;white-space:nowrap;font-weight:600}table.dt td.note{widt
 .dgiv-grid .L-bank .bkc{font-size:8px;fill:#5d6678;font-style:italic}
 .dgiv-vleg>span{margin-left:6px;white-space:nowrap}
 .dgiv-vleg i{display:inline-block;width:12px;height:10px;margin-right:2px;vertical-align:-1px;border:1px solid #1d2433}
+/* swap st sequential source stack: ① FP32 regs → cvt box → ② packed BF16 regs, then an exit connector from ② to the SMEM views.
+ * Both register viewports are bounded (independent scroll); the exit sits at the bottom of the stack = level with ②. */
+.dgiv-flow.has-stack{align-items:flex-start}
+.dgiv-stackwrap{display:flex;align-items:flex-end;flex-shrink:0;max-width:100%;min-width:0}
+.dgiv-stack{min-width:0;max-width:100%}
+.dgiv-stack .dgiv-regbox{max-height:250px}
+.dgiv-conv{display:flex;align-items:center;gap:8px;margin:0 0 0 18px;padding:3px 8px;max-width:380px;border:1px dashed #556079;border-radius:6px;background:#f4f6fb;font:11px/1.35 Consolas,Menlo,monospace;color:#1d2433}
+.dgiv-conv-ar::before{content:'↓';font:700 22px/1 sans-serif;color:#556079}
+.dgiv-exit{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;width:92px;margin:0 0 110px 2px;font:10.5px/1.3 Consolas,Menlo,monospace;color:#384056}
+.dgiv-exit-t{padding:2px 4px;border:1px dashed #556079;border-radius:5px;background:#f4f6fb}
+.dgiv-exit-ar{display:block;margin-top:2px}
+/* packed BF16 registers: one outlined box per 32-bit p_k holding two clickable 16-bit halves (L = [15:0], H = [31:16]) */
+.dgiv-regbox .rb-pkh small{display:block;font-size:8.5px;line-height:11px;font-weight:400;color:#5d6678}
+.dgiv-regbox .rb-pk{display:flex;gap:2px;margin:1px 3px;padding:1px;border:1.5px solid #3d465a;border-radius:4px;background:#eef1f7}
+.dgiv-regbox .rb-pk .rb-cell{width:32px;margin:0}
+@container dgiv (max-width: 900px){
+  .dgiv-stackwrap{flex-direction:column;align-items:flex-start}
+  .dgiv-exit{flex-direction:row;align-items:center;gap:6px;width:auto;margin:4px 0 0 40px}
+  .dgiv-exit-ar{display:none}
+  .dgiv-exit::before{content:'↓';order:-1;font-size:22px;line-height:1;color:#556079}
+}
 
 </style>
 </head>
@@ -1504,7 +1525,8 @@ root.DGDescUI = { forTile, forTMEM, forGM, forRG };
  * Integrated copy (DeepGEMM_SM100_FP8_Layout_Claude.html): upstream instruction-elements/src/instruction-view.js
  * sha256 0f68a472…cd7b45, amended only by: no title tooltip on the 共享 badge; optional opts.chipAttrs(param, viewId)
  * for host property metadata on header chips; optional opts.onLocal(viewId) after a local (data-iv) re-render;
- * swap st: local loc.mode ('lane' | 'warp') and a boxed register source (regBoxHTML, data-iv-box / data-iv-cell). */
+ * swap st: local loc.mode ('lane' | 'warp') and a boxed register source (regBoxHTML, data-iv-box / data-iv-cell);
+ * the source is a sequential stack (flow item .stack): FP32 values[j] ('reg') → cvt → packed BF16 p_k halves ('regbf16', pn.packed). */
 (function (root) {
 'use strict';
 
@@ -1538,6 +1560,7 @@ const SRC = {
   ld16ptx: ['third-party/cutlass/include/cute/arch/copy_sm100.hpp:628 · copy_traits_sm100.hpp:467-482', 'tcgen05.ld.sync.aligned.16x256b.x1.b32 {%0..%3}, [%4];\nDstLayout = ((_4,_8),(_64,_2)) : ((_64,_256),(_1,_2048))   // (thr,bit) → bit; 256 bit/行, 16 行'],
   stsm: ['deep_gemm/include/deep_gemm/epilogue/sm100_store_cd_swap_ab.cuh:86-88,124-136', 'outer_atom_offset = (epilogue_warp_idx / kNumWarpsPerAtom) * STORE_BLOCK_M * kSwizzleCDMode;\ninner_atom_offset = i * kNumSwizzleAtomRows * kSwizzleCDMode;\nuint32_t row = lane_idx % 8;\nuint32_t col = (epilogue_warp_idx % 2) * 4 + lane_idx / 8;\nauto smem_ptr = smem_base_ptr + row * (kNumBankGroupBytes * 8) + (col ^ row) * kNumBankGroupBytes;\nptx::SM90_U32x4_STSM_T<int>::copy(pack(v0,v1), pack(v2,v3), pack(v4,v5), pack(v6,v7), smem_ptr);'],
   stsmptx: ['deep_gemm/include/deep_gemm/ptx/ld_st.cuh:72', 'stmatrix.sync.aligned.x4.m8n8.shared.b16.trans [%0], {%1, %2, %3, %4};'],
+  pack: ['deep_gemm/include/deep_gemm/common/math.cuh:73-75 · epilogue/sm100_store_cd_swap_ab.cuh:132-135', 'CUTLASS_DEVICE int cast_into_bf16_and_pack(old_t& x, old_t& y) {\n    auto bf16x2 = __float22bfloat162_rn({*reinterpret_cast<float*>(&x), *reinterpret_cast<float*>(&y)});   // x → 低 16 位，y → 高 16 位\n    return *reinterpret_cast<int*>(&bf16x2); }\n// p_k = cast_into_bf16_and_pack(values[2k], values[2k+1])，k = 0..3 → SM90_U32x4_STSM_T::copy(p0, p1, p2, p3, smem_ptr)'],
   tmaAB: ['deep_gemm/include/deep_gemm/impls/sm100_fp8_fp4_gemm_1d1d.cuh:255-262 · common/tma_copy.cuh:25-35', 'tma::copy<BLOCK_K, LOAD_BLOCK_M, kSwizzleAMode, a_dtype_t>(&tensor_map_a, full_barriers[stage_idx], smem_a[stage_idx], k_a_idx, m_idx, 1, batch_idx);\ntma::copy<BLOCK_K, LOAD_BLOCK_N, kSwizzleBMode, b_dtype_t>(&tensor_map_b, full_barriers[stage_idx], smem_b[stage_idx], k_b_idx, n_idx, 1, batch_idx);\n// BLOCK_INNER_ATOM = kSwizzleMode / sizeof(dtype) = 128 → BLOCK_K/128 = 1 条 SM90_TMA_LOAD_2D'],
   tmaPtx: ['third-party/cutlass/include/cute/arch/copy_sm90_tma.hpp:124-126', 'cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes.L2::cache_hint [%0], [%1, {%3, %4}], [%2], %5;'],
   tmaSF: ['deep_gemm/include/deep_gemm/impls/sm100_fp8_fp4_gemm_1d1d.cuh:271-283', 'uint32_t sfa_m_idx = m_block_idx * BLOCK_M;\ntma::copy<BLOCK_M, 1, 0>(&tensor_map_sfa, full_barriers[stage_idx], smem_sfa[stage_idx], sfa_m_idx, sfa_k_idx);\nuint32_t sfb_n_idx = n_block_idx * BLOCK_N;\ntma::copy<BLOCK_N, 1, 0>(&tensor_map_sfb, full_barriers[stage_idx], smem_sfb[stage_idx], sfb_n_idx, sfb_k_idx);'],
@@ -1911,9 +1934,9 @@ function planSt(N) {
   const lds = range(32).map(L => ldSwap(M, c, w, L));
   const dstOf = (L, j) => { const k = j >> 1, h = j & 1, rr = 8 * c.i + 2 * (L & 3) + h, n = 32 * ew + 8 * k + (L >> 2), rel = cdSwapElemRel(rr, n);
     return { k, h, rr, n, rel, abs: base + rel, addrLane: 8 * k + (rr & 7) }; };
-  const reg = { id: 'reg', box: true, title: `源：warp ${w} 寄存器 values[0..7]（FP32，来自两条 16x256b）`,
-    sub: (warp ? `Warp 视图：32 线程 × 8 = 256 个 FP32（1024B），颜色 = values[j] 下标（每色 32 个）` : `Lane 视图：彩色 = 所选 Thread ${l} 的 values[0..7]，与目标落点同色`)
-      + '；每格 = 1 个 FP32（32 bit）；悬停 / 点击看 D 坐标与去向',
+  const reg = { id: 'reg', box: true, title: `① 源：warp ${w} 寄存器 values[0..7]（FP32，来自两条 16x256b）`,
+    sub: (warp ? `Warp 视图：32 线程 × 8 = 256 个 FP32 寄存器（1024B），颜色 = values[j] 下标（每色 32 个）` : `Lane 视图：彩色 = 所选 Thread ${l} 的 values[0..7]，与 BF16 寄存器及目标落点同色`)
+      + '；每格 = 1 个 FP32 寄存器（32 bit）；悬停 / 点击看 D 坐标与去向',
     rows: 32, cols: 8, rlab: r => `Thread ${r}`, clab: j => `values[${j}]`, unit: 'FP32 · 32 bit', mode: warp ? 'warp' : 'lane', lane: l,
     status: (r, j) => lds[r].regs[j].status === 'ok' ? 'ok' : 'junk', inst: () => true, own: warp ? () => true : r => r === l, vcol: warp ? (r, j) => j : (r, j) => r === l ? j : null,
     text: (r, j) => { const x = lds[r].regs[j], d = dstOf(r, j); return [`D[${x.d[0]}, ${x.d[1]}]`, `→ p${d.k}.${d.h ? 'hi' : 'lo'} → BF16 [${d.rr}, ${d.n}]`]; },
@@ -1924,38 +1947,61 @@ function planSt(N) {
         ['转换', `cvt.rn.bf16x2.f32 → p${d.k} 的${d.h ? '高' : '低'} 16 位 = BF16（16 bit = 2B）`],
         ['去向', `smem_cd[${c.out}] 逻辑 [${d.rr}, ${d.n}]（stmatrix 矩阵 ${d.k}）：smem_base + ${d.abs}（${hex(d.abs)}），bank ${bank(d.abs)}`],
         warp ? null : ['行地址由', `同 warp lane ${d.addrLane}（矩阵 ${d.k} 第 ${d.rr & 7} 行）提供`]], [SRC.ld16, SRC.stsm, SRC.stsmptx]).thread(r, w); } };
+  /* ② packed BF16 registers after cast_into_bf16_and_pack (math.cuh:73-75): per lane 4 × 32-bit p_k, p_k[15:0] = bf16(values[2k]),
+   * p_k[31:16] = bf16(values[2k+1]). Logical cell (r = lane, c = j) is ONE 16-bit half; regBoxHTML groups halves 2k / 2k+1 into one word. */
+  const hb = h => h ? '[31:16]' : '[15:0]';
+  const regbf16 = { id: 'regbf16', box: true, packed: true, title: `② cvt 后：warp ${w} packed 寄存器 p0..p3（每个 32 bit = 2 × BF16）`,
+    sub: (warp ? `Warp 视图：32 线程 × 4 个 32 bit 寄存器 = 128 个寄存器（512B）= 256 个 BF16，颜色 = 源 values[j] 下标` : `Lane 视图：彩色 = 所选 Thread ${l} 的 8 个 BF16 半字（同色 = 同一 values[j]）`)
+      + '；外框 = 1 个 32 bit 寄存器 p_k，L = 低 16 位 bf16(values[2k])，H = 高 16 位 bf16(values[2k+1])；每个半字 = 1 个 BF16（16 bit）可单独点击',
+    rows: 32, cols: 8, rlab: r => `Thread ${r}`, clab: j => `p${j >> 1}${hb(j & 1)}=bf16(values[${j}])`, unit: 'BF16 · 16 bit（packed 寄存器的一半）', mode: reg.mode, lane: l,
+    status: reg.status, inst: () => true, own: reg.own, vcol: reg.vcol,
+    text: (r, j) => { const x = lds[r].regs[j], d = dstOf(r, j); return [`p${d.k}.${d.h ? 'hi' : 'lo'} ${hb(d.h)} = bf16(values[${j}])`, `D[${x.d[0]}, ${x.d[1]}]`, `→ BF16 [${d.rr}, ${d.n}]`]; },
+    data: (r, j) => { const x = lds[r].regs[j], d = dstOf(r, j); return { lane: r, reg: j, dtype: 'bf16', bits: 16, packed: d.k, half: d.h, word: 'p' + d.k, wbits: 32, d: x.d.join(','), dst: d.rr + ',' + d.n }; },
+    info: (r, j) => { const x = lds[r].regs[j], d = dstOf(r, j), pr = dstOf(r, j ^ 1), q = d.rel & 3, mo = inv[((d.rel & ~3) + (q ? 0 : 2)) >> 1], mw = swapOwner(mo[0], mo[1]);
+      return kvInfo(`warp ${w} lane ${r} 的 p${d.k}.${d.h ? 'hi' : 'lo'}（BF16）`, [['逻辑', fmtD(x.d, M)],
+        ['位置', `寄存器 p${d.k}（每线程私有，32 bit，无地址/bank）的${d.h ? '高' : '低'} 16 位 ${hb(d.h)}；同一寄存器另一半 = bf16(values[${j ^ 1}])`],
+        ['类型', 'BF16（16 bit = 2B）；所在 packed 寄存器 32 bit = 4B'], ['状态', ST[x.status]],
+        ['来自 FP32', `values[${j}]（FP32，32 bit；TMEM lane ${x.lane}, col ${x.col}，第 ${x.load + 1} 条 16x256b）`],
+        ['转换', `p${d.k} = cast_into_bf16_and_pack(values[${2 * d.k}], values[${2 * d.k + 1}]) → __float22bfloat162_rn({x, y})：x → 低 16 位，y → 高 16 位（round-to-nearest-even）`],
+        ['去向', `smem_cd[${c.out}] 逻辑 [${d.rr}, ${d.n}]（stmatrix 矩阵 ${d.k}）：SMEM 目标 smem_base + ${d.abs}（${hex(d.abs)}），bank ${bank(d.abs)}，bank 字内字节 ${q}..${q + 1}`],
+        ['bank 字 ≠ 寄存器', `目标 4B bank 字的另一半 = [${mo[0]}, ${mo[1]}]（来自 warp ${4 + mw.warpRel} lane ${mw.lane} 的 p${mw.k}.${mw.half ? 'hi' : 'lo'}）；本寄存器另一半 p${d.k}.${d.h ? 'lo' : 'hi'} → [${pr.rr}, ${pr.n}]（相邻行，smem_base + ${pr.abs}）`],
+        warp ? null : ['行地址由', `同 warp lane ${d.addrLane}（矩阵 ${d.k} 第 ${d.rr & 7} 行）提供`]], [SRC.pack, SRC.stsm, SRC.stsmptx]).thread(r, w); } };
   /* linked selection: ONE canonical element = source (lane, values[j]) of warp w, iteration i, in this workload/tile/acc/slot/s.
-   * A click in any of reg / zoom / cdl / cdp stores it in LOCAL.st.link (key = context it belongs to); every panel then marks
+   * A click in any of reg / regbf16 / zoom / cdl / cdp stores it in LOCAL.st.link (key = context it belongs to); every panel then marks
    * its own coordinates of that element. Any context change not made by the click itself (key mismatch, or a different
    * lane in Lane 视图) drops it together with the clicked cell, so no stale red mark can survive. */
   const ctxKey = (ww, ii) => [M.m, M.desc.n, K.BLOCK_M, K.BLOCK_N, t.mb, t.nb, c.acc, c.out, c.s, ww, ii].join('|');
-  const toPanels = (L, j) => { const d = dstOf(L, j); return { reg: [L, j], zoom: [d.rr - 8 * c.i, d.n - 32 * ew], cdl: [d.rr, d.n], cdp: [d.rel >> 7, (d.rel & 127) >> 1] }; };
+  const toPanels = (L, j) => { const d = dstOf(L, j); return { reg: [L, j], regbf16: [L, j], zoom: [d.rr - 8 * c.i, d.n - 32 * ew], cdl: [d.rr, d.n], cdp: [d.rel >> 7, (d.rel & 127) >> 1] }; };
   const ownerOf = (rr, n) => { const o = swapOwner(rr, n); return { w: E.firstWarp + o.warpRel, i: o.i, lane: o.lane, j: o.reg }; };
-  const fromPanel = (p, r, cc) => { if (p === 'reg') return { w, i: c.i, lane: r, j: cc }; if (p === 'zoom') return ownerOf(8 * c.i + r, 32 * ew + cc);
+  const fromPanel = (p, r, cc) => { if (p === 'reg' || p === 'regbf16') return { w, i: c.i, lane: r, j: cc }; if (p === 'zoom') return ownerOf(8 * c.i + r, 32 * ew + cc);
     if (p === 'cdl') return ownerOf(r, cc); const v = p === 'cdp' ? inv[r * 64 + cc] : null; return v ? ownerOf(v[0], v[1]) : null; };
   let link = N.loc.link;
   if (link && !(link.key === ctxKey(w, c.i) && (warp || link.lane === l))) { link = null; N.loc.link = N.loc.el = null; if (LOCAL.st) Object.assign(LOCAL.st, { link: null, el: null }); }
   const linkSel = link ? Object.assign(toPanels(link.lane, link.j), { meta: { lane: link.lane, j: link.j } }) : null;
   const head = { title: `cvt + stmatrix.x4.trans：寄存器 → 输出 SMEM（swap，warp ${w} ${warp ? '整个 warp · Warp 视图' : `lane ${l}`}，s=${c.s}，i=${c.i}）`, simt: true, mode: reg.mode, vcolors: true, addrOutline: !warp,
     vlegLabel: warp ? '颜色=values[j]下标；格内数字=数据来自的lane：' : '所选 lane 的 values[j]：',
-    legendNote: '源格 = FP32（32 bit）；目标格 = BF16（16 bit）', map: th, controls: ['loc.mode', 'rg.w', 'rg.l', 'rg.s', 'rg.i'],
-    linkNote: '红框 = 联动选中：点击任一视图（源寄存器 / 放大 / 逻辑 / 物理）中的元素，四个视图同时标出同一个元素（FP32 源 values[j] ↔ 转换后的 BF16 落点）；绿色边框仍只表示地址行',
+    legendNote: '① FP32 寄存器格 = 32 bit；② packed 寄存器 p_k = 32 bit，L/H 半格 = BF16 16 bit；目标格 = BF16（16 bit）', map: th, controls: ['loc.mode', 'rg.w', 'rg.l', 'rg.s', 'rg.i'],
+    linkNote: '红框 = 联动选中：点击任一视图（① FP32 寄存器 / ② BF16 寄存器半字 / 放大 / 逻辑 / 物理）中的元素，五个视图同时标出同一个元素（FP32 values[j] → p_k 的 lo/hi BF16 → SMEM 落点）；绿色边框仍只表示地址行',
     link: { sel: link ? { w, i: c.i, lane: link.lane, j: link.j } : null, ctxKey, fromPanel, toPanels }, linkSel, linkKey: link ? `${link.key}|${link.lane}|${link.j}` : null };
   const dst = { group: 'dst', title: `目标：输出 SMEM 槽 ${c.out}（放大 / 逻辑 / 物理是同一缓冲的三种视图）`, views: [zoom, logical, phys] };
+  /* source = sequential stack (not parallel views): ① FP32 → cvt (conv) → ② packed BF16; the exit connector leaves from ② */
+  const src = (conv, exit) => ({ group: 'src', stack: true, title: `源：warp ${w} 寄存器（每线程私有）—— 先 FP32，cvt 打包后才是 BF16`, views: [reg, regbf16], conv, exit });
   if (warp) return Object.assign(head, {
     ptx: ['cvt.rn.bf16x2.f32 p_k, v(2k+1), v(2k);   // k = 0..3，每 lane 4 条；整个 warp 128 个 packed u32', 'stmatrix.sync.aligned.x4.m8n8.shared.b16.trans [addr_lane], {p0, p1, p2, p3};   // addr_lane = 每个 lane 各自的 16B 行地址（逐 lane 地址见 Lane 视图）'],
-    issuer: `stmatrix 是 warp 集体指令：warp ${w} 的 32 个线程 × 8 个 FP32（256 × 32 bit = 1024B）→ 128 个 packed u32 → 256 个 BF16（512B），写成 4 个 8×8 BF16 矩阵 = 逻辑行 ${th.warpRange.rows[0]}..${th.warpRange.rows[1]} × 列 ${th.warpRange.cols[0]}..${th.warpRange.cols[1]}；颜色 = 源 values[j] 下标（j = 2k + h），不是 lane。`,
-    flow: [reg, { proc: ['256 × FP32（32 lane × 8，1024B）', '→ cvt.rn.bf16x2 ×128', '→ 128 × u32 packed', '→ stmatrix .x4.trans：', '4 个 8×8 矩阵，行 = m，列 = n', `→ 256 × BF16（512B）`] }, dst],
+    issuer: `stmatrix 是 warp 集体指令：warp ${w} 的 32 个线程 × 8 个 FP32（256 × 32 bit = 1024B）→ 32 × 4 = 128 个 packed 32 bit 寄存器（512B，= 256 个 BF16 × 16 bit）→ 写成 4 个 8×8 BF16 矩阵 = 逻辑行 ${th.warpRange.rows[0]}..${th.warpRange.rows[1]} × 列 ${th.warpRange.cols[0]}..${th.warpRange.cols[1]}；颜色 = 源 values[j] 下标（j = 2k + h），不是 lane。`,
+    flow: [src(['cvt.rn.bf16x2.f32 × 128（32 lane × 4）', '256 × FP32（1024B）→ 128 × 32 bit = 256 × BF16（512B）', 'p_k[15:0] = bf16(values[2k])，p_k[31:16] = bf16(values[2k+1])'],
+      ['stmatrix .x4.trans', '{p0..p3} × 32 lane', '→ 4 个 8×8 BF16', '行 = m，列 = n']), dst],
     threadTitle: `warp ${w} 整体映射（4 个 8×8 矩阵）`,
     thread: { head: ['矩阵 k', '源寄存器（32 lane）', 'packed', '目标逻辑范围', '元素', '字节'], rows: range(4).map(k => [`k=${k}`, `values[${2 * k}], values[${2 * k + 1}] × 32 = 64 × FP32`, `p${k} × 32 = 32 × u32`, `行 ${th.warpRange.rows[0]}..${th.warpRange.rows[1]}，列 ${32 * ew + 8 * k}..${32 * ew + 8 * k + 7}`, '64 × BF16', '128B'])
-      .concat([['合计', '256 × FP32（1024B）', '128 × u32', `行 ${th.warpRange.rows[0]}..${th.warpRange.rows[1]}，列 ${th.warpRange.cols[0]}..${th.warpRange.cols[1]}`, '256 × BF16', '512B']]) },
-    facts: [['本 warp 一次', '256 × FP32（1024B 寄存器）→ 128 × packed u32 → 256 × BF16 = 4 个 8×8 矩阵 = 512B'], ['地址', '每个 lane 提供 1 个 16B 行地址（32 行 = 4 矩阵 × 8 行）；逐 lane 地址只在 Lane 视图显示']] });
+      .concat([['合计', '256 × FP32（1024B）', '128 × u32（512B）', `行 ${th.warpRange.rows[0]}..${th.warpRange.rows[1]}，列 ${th.warpRange.cols[0]}..${th.warpRange.cols[1]}`, '256 × BF16', '512B']]) },
+    facts: [['本 warp 一次', '256 × FP32（1024B 寄存器）→ 128 × packed 32 bit 寄存器（512B = 256 × BF16）→ 4 个 8×8 矩阵 = 512B SMEM'], ['地址', '每个 lane 提供 1 个 16B 行地址（32 行 = 4 矩阵 × 8 行）；逐 lane 地址只在 Lane 视图显示']] });
   return Object.assign(head, {
     ptx: ['cvt.rn.bf16x2.f32 p_k, v(2k+1), v(2k);   // k = 0..3', `stmatrix.sync.aligned.x4.m8n8.shared.b16.trans [smem_base + ${th.addrRow.abs}], {p0, p1, p2, p3};   // 本 lane 提供矩阵 ${th.addrRow.matrix} 第 ${th.addrRow.row} 行地址`],
-    issuer: `stmatrix 是 warp 集体指令（整个 warp 32 线程一起执行）：lane ${l} 的 4 个 packed 寄存器写到 ${new Set(th.elems.map(e => e.addrLane)).size} 个不同 lane 提供的行地址；它自己提供的地址（绿色边框）接收 lane ${th.addrRow.fromLanes.join('/')} 的${th.addrRow.fromHalf ? '高' : '低'} 16 位。`,
-    flow: [reg, { proc: ['8 × FP32（32 bit）', '→ cvt.rn.bf16x2 ×4', '→ p0..p3（每个 = 同一 n 的相邻两 m）', '→ stmatrix .trans：', '矩阵 k 的行 = m，列 = n', '→ 8 × BF16（16 bit）'] }, dst],
-    thread: { head: ['packed.half', '寄存器（FP32）', '逻辑元素（BF16）', 'SMEM 字节', 'bank', '地址由 lane'], rows: th.elems.map(e => [`p${e.k}.${e.half ? 'hi' : 'lo'}`, `values[${e.reg}]`, fmtD(e.d, M), String(e.abs), String(e.bank), String(e.addrLane)]) },
-    facts: [['本 lane 地址', `smem_base + ${th.addrRow.abs}（atom ${th.atom}，行 ${th.addrRow.rr}，n ${th.addrRow.nCols[0]}..${th.addrRow.nCols[1]}；bank ${th.addrRow.banks.join(',')}）`], ['本 warp 一次', '256 × FP32 → 4 个 8×8 BF16 矩阵 = 512B']] });
+    issuer: `stmatrix 是 warp 集体指令（整个 warp 32 线程一起执行）：lane ${l} 的 8 个 FP32 先打包成 4 个 32 bit 寄存器 p0..p3（8 个 BF16），再写到 ${new Set(th.elems.map(e => e.addrLane)).size} 个不同 lane 提供的行地址；它自己提供的地址（绿色边框）接收 lane ${th.addrRow.fromLanes.join('/')} 的${th.addrRow.fromHalf ? '高' : '低'} 16 位。`,
+    flow: [src(['cvt.rn.bf16x2.f32 × 4（本 lane）', '8 × FP32（32B）→ 4 × 32 bit = 8 × BF16（16B）', 'p_k[15:0] = bf16(values[2k])，p_k[31:16] = bf16(values[2k+1])'],
+      ['stmatrix .x4.trans', '{p0..p3}', 'p_k 的 lo/hi → 相邻两行 m', '列 n 由 lane/4']), dst],
+    thread: { head: ['packed.half（BF16 寄存器）', '寄存器（FP32）', '逻辑元素（BF16）', 'SMEM 字节', 'bank', '地址由 lane'], rows: th.elems.map(e => [`p${e.k}.${e.half ? 'hi' : 'lo'} ${hb(e.half)}`, `values[${e.reg}]`, fmtD(e.d, M), String(e.abs), String(e.bank), String(e.addrLane)]) },
+    facts: [['本 lane 地址', `smem_base + ${th.addrRow.abs}（atom ${th.atom}，行 ${th.addrRow.rr}，n ${th.addrRow.nCols[0]}..${th.addrRow.nCols[1]}；bank ${th.addrRow.banks.join(',')}）`], ['本 warp 一次', '256 × FP32 → 128 × packed 32 bit（256 × BF16）→ 4 个 8×8 BF16 矩阵 = 512B']] });
 }
 /* inverse table: byte slot → logical [r,c] for physical panels */
 function invTable(bytes, eb, each) { const a = new Array(bytes / eb).fill(null); each((r, c, rel) => { a[rel / eb] = [r, c]; }); return a; }
@@ -2209,9 +2255,12 @@ function gridSVG(pn, sel, meta) {
  * scroll viewport (drag / wheel / keyboard). Cells only show v{j}; full detail is in title / aria-label and the inspector.
  * pn.vcol(r, j) → value index for a per-value fill (Lane 视图). Roving tabindex: the clicked cell, else the selected lane's values[0]. */
 function regBoxHTML(pn, sel, meta) {
-  const foc = sel || [pn.mode === 'lane' ? pn.lane : 0, 0];
-  let h = `<div class="rb-corner" title="${esc(`${pn.clab(0).replace(/\[\d+\]$/, '[j]')}：${pn.unit}`)}">${esc(pn.clab(0).replace(/\[\d+\]$/, '[j]'))}</div>`;
-  for (let j = 0; j < pn.cols; j++) h += pn.ctxCol   // optional: columns written by another instruction are muted context
+  const foc = sel || [pn.mode === 'lane' ? pn.lane : 0, 0], pk = !!pn.packed;
+  /* pn.packed: cell (r, j) is one 16-bit half; halves 2k / 2k+1 sit inside one outlined 32-bit register p_k (L = [15:0], H = [31:16]) */
+  const corner = pk ? 'Thread / p_k' : pn.clab(0).replace(/\[\d+\]$/, '[j]');
+  let h = `<div class="rb-corner" title="${esc(`${corner}：${pn.unit}`)}">${esc(corner)}</div>`;
+  if (pk) for (let k = 0; k < pn.cols / 2; k++) h += `<div class="rb-colh rb-pkh" data-k="${k}" title="${esc(`p${k}：1 个 32 bit 寄存器；L [15:0] = bf16(values[${2 * k}])，H [31:16] = bf16(values[${2 * k + 1}])`)}">p${k} · 32b<small>L[${2 * k}] H[${2 * k + 1}]</small></div>`;
+  else for (let j = 0; j < pn.cols; j++) h += pn.ctxCol   // optional: columns written by another instruction are muted context
     ? `<div class="rb-colh${pn.ctxCol(j) ? ' is-ctx' : ''}" data-c="${j}" data-active="${pn.ctxCol(j) ? 0 : 1}" title="${esc(`${pn.clab(j)}：${pn.ctxCol(j) ? '另一条指令写入（上下文）' : '本条指令写入'}`)}">[${j}]</div>`
     : `<div class="rb-colh" data-c="${j}" title="${esc(pn.clab(j))}">[${j}]</div>`;
   for (let r = 0; r < pn.rows; r++) {
@@ -2223,15 +2272,17 @@ function regBoxHTML(pn, sel, meta) {
       const cls = 'rb-cell' + (own ? ' is-own' : pn.inst(r, j) ? ' is-inst' : '') + (hasV ? ' is-v' : '') + (cx ? ' is-ctx' : '') + (st ? ' st-' + st : '') + (isSel ? ' is-sel' : '');
       const attrs = Object.keys(d).map(k => ` data-${k}="${esc(d[k])}"`).join('') + (hasV ? ` data-vj="${vj}" data-vcolor="${VCOL[vj]}" style="background-color:${VCOL[vj]};color:${VINK[vj]}"` : '');
       const label = `${pn.rlab(r)} ${pn.clab(j)}：${pn.unit}，${tx.join('，')}`;
+      if (pk && !(j & 1)) h += `<div class="rb-pk" data-k="${j >> 1}" data-r="${r}" role="group" aria-label="${esc(`${pn.rlab(r)} 的 p${j >> 1}（32 bit 寄存器 = 2 × BF16）`)}">`;
       h += `<button type="button" class="${cls}" data-iv-cell="${pn.id}" data-r="${r}" data-c="${j}" data-own="${own ? 1 : 0}"${attrs}${isSel && meta ? ` data-iv-sel="link" data-j="${j}"` : ''} tabindex="${foc[0] === r && foc[1] === j ? 0 : -1}"`
-        + ` aria-pressed="${isSel}" aria-label="${esc(label)}" title="${esc(label)}">v${j}</button>`;
+        + ` aria-pressed="${isSel}" aria-label="${esc(label)}" title="${esc(label)}">${pk ? `${j & 1 ? 'H' : 'L'}·v${j}` : `v${j}`}</button>`;
+      if (pk && (j & 1)) h += '</div>';
     }
   }
-  const bar = [['top', `⇡ ${pn.rlab(0)}`], pn.mode === 'lane' ? ['lane', `◎ ${pn.rlab(pn.lane)}`] : null, ['bottom', `⇣ ${pn.rlab(pn.rows - 1)}`], ['left', `⇠ [0]`, pn.clab(0)], ['right', `[${pn.cols - 1}] ⇢`, pn.clab(pn.cols - 1)]].filter(Boolean)
+  const bar = [['top', `⇡ ${pn.rlab(0)}`], pn.mode === 'lane' ? ['lane', `◎ ${pn.rlab(pn.lane)}`] : null, ['bottom', `⇣ ${pn.rlab(pn.rows - 1)}`], ['left', pk ? '⇠ p0' : `⇠ [0]`, pn.clab(0)], ['right', pk ? `p${pn.cols / 2 - 1} ⇢` : `[${pn.cols - 1}] ⇢`, pn.clab(pn.cols - 1)]].filter(Boolean)
     .map(([k, t, full]) => `<button type="button" data-iv-scroll="${k}"${full ? ` title="${esc(full)}" aria-label="${esc(full)}"` : ''}>${esc(t)}</button>`).join('');
   return `<div class="dgiv-boxbar" aria-label="滚动">${bar}</div>`
-    + `<div class="dgiv-regbox" data-iv-box="${pn.id}" data-mode="${pn.mode}" data-lane="${pn.lane}" data-rows="${pn.rows}" data-cols="${pn.cols}" role="group" aria-label="${esc(pn.title)}：拖动 / 滚轮 / 方向键浏览 ${pn.rows}×${pn.cols} 个寄存器">`
-    + `<div class="rb-grid" style="grid-template-columns:auto repeat(${pn.cols},auto)">${h}</div></div>`;
+    + `<div class="dgiv-regbox${pk ? ' is-packed' : ''}" data-iv-box="${pn.id}" data-mode="${pn.mode}" data-lane="${pn.lane}" data-rows="${pn.rows}" data-cols="${pn.cols}"${pk ? ` data-words="${pn.rows * pn.cols / 2}" data-word-bits="32" data-elem-bits="16"` : ''} role="group" aria-label="${esc(pn.title)}：拖动 / 滚轮 / 方向键浏览 ${pk ? `${pn.rows}×${pn.cols / 2} 个 32 bit 寄存器（${pn.rows * pn.cols} 个 BF16 半字）` : `${pn.rows}×${pn.cols} 个寄存器`}">`
+    + `<div class="rb-grid" style="grid-template-columns:auto repeat(${pk ? pn.cols / 2 : pn.cols},auto)">${h}</div></div>`;
 }
 const CTL = {
   'rg.w': (N) => ({ label: 'warp', opts: range(N.E.warps).map(j => N.E.firstWarp + j), v: N.sel.w }),
@@ -2306,8 +2357,15 @@ function render(edge, opts) {
   const panelHTML = f => `<figure class="dgiv-panel${f.box ? ' dgiv-boxp' : ''}" data-iv-panel="${f.id}"${f.mode ? ` data-iv-mode="${f.mode}"` : ''}><figcaption><b>${esc(f.title)}</b><br><span class="dgiv-mute">${esc(f.sub || '')}</span></figcaption>`
     + (f.box ? regBoxHTML(f, selOf(f), meta) : `<div class="dgiv-scroll">${gridSVG(f, selOf(f), meta)}</div>`) + '</figure>';
   let flow = '';
-  P.flow.forEach((f, j) => { if (j) flow += '<div class="dgiv-arrow" aria-hidden="true"></div>';
+  /* f.stack: a SEQUENTIAL source group (views[0] → f.conv → views[1], not parallel views); it is wrapped together with its exit
+   * connector (f.exit) so the arrow to the next item leaves level with the LAST stage, whatever the height of the target column */
+  const stackHTML = f => `<div class="dgiv-node dgiv-stackwrap"><section class="dgiv-group dgiv-stack" data-iv-role="${f.group}" data-iv-stack="seq"><div class="dgiv-gh">${esc(f.title)}</div><div class="dgiv-views">`
+    + f.views.map((v, k) => (k ? `<div class="dgiv-conv" data-iv-role="conv" aria-label="${esc(f.conv.join('；'))}"><span class="dgiv-conv-ar" aria-hidden="true"></span><div>${f.conv.map(x => `<div>${esc(x)}</div>`).join('')}</div></div>` : '') + panelHTML(v)).join('')
+    + `</div></section><div class="dgiv-exit" data-iv-role="exit" data-from="${f.views[f.views.length - 1].id}" aria-label="${esc(f.exit.join(' '))}"><div class="dgiv-exit-t">${f.exit.map(x => `<div>${esc(x)}</div>`).join('')}</div>`
+    + '<svg class="dgiv-exit-ar" width="64" height="40" viewBox="0 0 64 40" aria-hidden="true"><path d="M2 38 C 2 14, 20 8, 58 8" fill="none" stroke="#556079" stroke-width="2"/><path d="M50 2 L60 8 L50 14" fill="none" stroke="#556079" stroke-width="2"/></svg></div></div>';
+  P.flow.forEach((f, j) => { if (j && !(P.flow[j - 1].stack)) flow += '<div class="dgiv-arrow" aria-hidden="true"></div>';
     if (f.proc) flow += `<div class="dgiv-proc" data-iv-role="op">${f.proc.map(x => `<div>${esc(x)}</div>`).join('')}</div>`;
+    else if (f.stack) flow += stackHTML(f);
     else if (f.group) flow += `<section class="dgiv-node dgiv-group" data-iv-role="${f.group}"><div class="dgiv-gh">${esc(f.title)}</div><div class="dgiv-views">${f.views.map(panelHTML).join('')}</div></section>`;
     else flow += `<section class="dgiv-node${f.box ? ' dgiv-node-box' : ''}" data-iv-role="${j === 0 ? 'src' : 'dst'}">${panelHTML(f)}</section>`; });
   const thread = P.thread ? `<table class="dgiv-thr"><tr>${P.thread.head.map(h => `<th>${esc(h)}</th>`).join('')}</tr>${P.thread.rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</table>` : '';
@@ -2319,7 +2377,7 @@ function render(edge, opts) {
 <div class="dgiv-ctl">${controlsHTML(P, !!opts.onChange, id)}</div>
 <pre class="dgiv-ptx">${esc(P.ptx.join('\n'))}</pre>
 ${legendHTML(P)}
-<div class="dgiv-flow${P.vertical ? ' vert' : ''}">${flow}</div>
+<div class="dgiv-flow${P.vertical ? ' vert' : ''}${P.flow.some(f => f.stack) ? ' has-stack' : ''}">${flow}</div>
 ${infoHTML(P, el)}
 ${thread ? `<details class="dgiv-tbl" open><summary>${esc(P.threadTitle || '所选线程的精确映射')}</summary>` + thread + '</details>' : ''}
 <div class="dgiv-facts">${P.facts.map(([k, v]) => `<span><b>${esc(k)}</b> ${esc(v)}</span>`).join('')}</div>
