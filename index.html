@@ -279,6 +279,60 @@ table.dt th{width:190px;white-space:nowrap;font-weight:600}table.dt td.note{widt
 .dgiv-thr th{background:#eef1f7}
 .dgiv-thr td{font-family:Consolas,Menlo,monospace}
 .dgiv-facts{display:flex;flex-wrap:wrap;gap:3px 14px;font-size:12px;color:#384056;margin-top:4px}
+/* Lane / Warp view toggle (segmented radio pair) */
+.dgiv-seg{position:relative;display:inline-flex;border:1px solid #9aa5bb;border-radius:6px;overflow:hidden}
+.dgiv-seg label{padding:1px 10px 1px 6px;cursor:pointer;background:#fff}
+.dgiv-seg label+label{border-left:1px solid #9aa5bb}
+.dgiv-ctl .dgiv-seg input{margin:0 3px 0 0;padding:0;border:0;vertical-align:-1px}
+.dgiv-seg label:has(input:checked){background:#1d3f86;color:#fff;font-weight:600}
+/* boxed register file: one small box per Thread × values[j] (≈36×18), bounded viewport with sticky headers, drag to pan.
+ * Fixed widths: 62px thread column + 8 × 40px → all 8 columns visible in ~400px; narrower panels scroll horizontally. */
+.dgiv-boxp{max-width:100%}
+/* the boxed source keeps its 8-column width in the desktop row; wide target views (e.g. 942px bank SVG) shrink into their own
+ * scroll instead. Still capped at 100% so the narrow (column) layout scrolls inside the viewport, never the page. */
+.dgiv-node-box{flex-shrink:0;max-width:100%}
+.dgiv-boxp figcaption{max-width:404px}
+.dgiv-boxbar{display:flex;flex-wrap:wrap;gap:3px 5px;align-items:center;margin:2px 0 3px}
+.dgiv-boxbar button{font:inherit;font-size:10.5px;line-height:1.4;padding:0 5px;border:1px solid #c5ccda;border-radius:4px;background:#f4f6fb;cursor:pointer}
+.dgiv-regbox{width:404px;max-width:100%;max-height:560px;overflow-x:auto;overflow-y:scroll;border:1px solid #d6dbe6;border-radius:6px;background:#fff;cursor:grab;user-select:none;-webkit-user-select:none;overscroll-behavior:contain}
+.dgiv-regbox.drag{cursor:grabbing}
+.dgiv-regbox .rb-grid{display:grid;width:max-content;font-family:Consolas,Menlo,monospace}
+.dgiv-regbox .rb-colh,.dgiv-regbox .rb-corner{position:sticky;top:0;z-index:2;background:#eef1f7;border-bottom:1px solid #c5ccda;padding:1px 2px;font-size:10px;line-height:14px;font-weight:600;color:#1d3f86;text-align:center;white-space:nowrap}
+.dgiv-regbox .rb-corner{left:0;z-index:3;width:62px;box-sizing:border-box;text-align:left;padding-left:4px}
+.dgiv-regbox .rb-rowh{position:sticky;left:0;z-index:1;width:62px;box-sizing:border-box;background:#f7f9fd;border-right:1px solid #c5ccda;padding:0 4px;font-size:10px;line-height:20px;color:#384056;white-space:nowrap}
+.dgiv-regbox .rb-rowh.is-own{color:#b85c00;font-weight:700;box-shadow:inset 3px 0 0 #ff8c1a}
+.dgiv-regbox .rb-cell{display:block;width:36px;height:18px;margin:1px 2px;padding:0;border:1px solid #8a94aa;border-radius:3px;background:#fff;font:9px/16px Consolas,Menlo,monospace;color:#5d6678;text-align:center;cursor:pointer;overflow:hidden}
+.dgiv-regbox.drag .rb-cell{cursor:grabbing}
+.dgiv-regbox .rb-cell.is-inst{background-color:rgba(42,100,200,.16)}
+.dgiv-regbox .rb-cell.is-own{background-color:rgba(255,140,26,.85);border-color:#b85c00;color:#3a1f00}
+.dgiv-regbox .rb-cell.is-v{border-color:#1d2433;font-weight:700}
+.dgiv-regbox .rb-cell.st-junk{background-image:repeating-linear-gradient(0deg,rgba(90,90,90,.35) 0 1.5px,transparent 1.5px 5px)}
+.dgiv-regbox .rb-cell.is-sel{outline:2.5px solid #e5243b;outline-offset:1px}
+/* context columns (written by another instruction, e.g. the other 16x256b load): same hue, washed out + dashed border.
+ * A white overlay (not opacity) keeps the red selection / focus outline at full strength. */
+.dgiv-regbox .rb-cell.is-ctx{border-style:dashed;border-color:#9aa5bb;font-weight:400;color:#6b7690 !important;background-image:linear-gradient(rgba(255,255,255,.66),rgba(255,255,255,.66))}
+.dgiv-regbox .rb-cell.is-ctx.st-junk{background-image:repeating-linear-gradient(0deg,rgba(90,90,90,.35) 0 1.5px,transparent 1.5px 5px),linear-gradient(rgba(255,255,255,.66),rgba(255,255,255,.66))}
+.dgiv-regbox .rb-colh.is-ctx{color:#9aa5bb;font-weight:400;font-style:italic}
+.dgiv-regbox .rb-cell:focus-visible{outline:2px solid #1d3f86;outline-offset:2px}
+/* Lane 视图 value colours (fills) and the address row (green outline, drawn above fills and the selection) */
+.dgiv-grid .L-vcol rect{stroke:#1d2433;stroke-width:.6}
+.dgiv-grid .L-auxo rect{fill:none;stroke:#0a8f4c;stroke-width:2.2;pointer-events:none}
+.dgiv-legend .lg-auxo{background:transparent;border:2px solid #0a8f4c}
+/* linked selection (swap st): red box just outside the cell in every view; legend note */
+.dgiv-grid .selk{fill:none;stroke:#e5243b;stroke-width:2;pointer-events:none}
+.dgiv-regbox .rb-cell.is-sel[data-iv-sel="link"]{outline:2.5px solid #e5243b;outline-offset:1px}
+.dgiv-linknote{color:#384056;font-size:11.5px}
+.dgiv-legend .lg-selk{background:transparent;border:2px solid #e5243b;border-radius:2px}
+/* optional physical bank overlay (swap st cdp): bank 0..31 header, byte ticks 0..3, strong bank / weak element separators */
+.dgiv-grid .L-bank{pointer-events:none}
+.dgiv-grid .L-bank .bk{stroke:#3d465a;stroke-width:1}
+.dgiv-grid .L-bank .bh{stroke:#6b7690;stroke-width:.6;stroke-dasharray:2 2}
+.dgiv-grid .L-bank .bt{stroke:#8a94aa;stroke-width:.6}
+.dgiv-grid .L-bank .bkn{font-size:9px;font-weight:600;fill:#1d3f86}
+.dgiv-grid .L-bank .bkt{font-size:6.5px;fill:#5d6678}
+.dgiv-grid .L-bank .bkc{font-size:8px;fill:#5d6678;font-style:italic}
+.dgiv-vleg>span{margin-left:6px;white-space:nowrap}
+.dgiv-vleg i{display:inline-block;width:12px;height:10px;margin-right:2px;vertical-align:-1px;border:1px solid #1d2433}
 
 </style>
 </head>
@@ -1449,7 +1503,8 @@ root.DGDescUI = { forTile, forTMEM, forGM, forRG };
  * only instruction-internal choices (SFA/SFB, transpose step, swap load half, store atom, clicked element) are local.
  * Integrated copy (DeepGEMM_SM100_FP8_Layout_Claude.html): upstream instruction-elements/src/instruction-view.js
  * sha256 0f68a472…cd7b45, amended only by: no title tooltip on the 共享 badge; optional opts.chipAttrs(param, viewId)
- * for host property metadata on header chips; optional opts.onLocal(viewId) after a local (data-iv) re-render. */
+ * for host property metadata on header chips; optional opts.onLocal(viewId) after a local (data-iv) re-render;
+ * swap st: local loc.mode ('lane' | 'warp') and a boxed register source (regBoxHTML, data-iv-box / data-iv-cell). */
 (function (root) {
 'use strict';
 
@@ -1637,7 +1692,7 @@ function tmaStore(M, c, j) {
 /* state normalization: shared (rg/dk/ctx) is read; local is per-edge and module-owned     */
 const LOCAL = {};
 function defLocal(edge) {
-  return { el: null, which: edge === 'tmaSF' || edge === 'tr' || edge === 'cp' ? 'SFA' : undefined, blk: 0, step: 0, half: 0, atom: 0, obs: false, obsRC: null };
+  return { el: null, which: edge === 'tmaSF' || edge === 'tr' || edge === 'cp' ? 'SFA' : undefined, blk: 0, step: 0, half: 0, atom: 0, obs: false, obsRC: null, mode: edge === 'st' || edge === 'ld' ? 'lane' : undefined, link: edge === 'st' || edge === 'ld' ? null : undefined };
 }
 function norm(edge, o) {
   const M = o.M, K = M.K, E = M.E, x = o.ctx || {};
@@ -1648,11 +1703,12 @@ function norm(edge, o) {
   /* clicked element / observed D are geometry-relative: drop them when the model geometry (M → layout) changes,
    * keep them across kb/kk/lane/tile changes; the cleared state is written back so local.get() stays truthful */
   const geo = `${M.m}|${M.path}|${K.UMMA_M}x${K.UMMA_N}|${K.BLOCK_M}x${K.BLOCK_N}`, stored = LOCAL[edge] || {};
-  if (stored.geo !== undefined && stored.geo !== geo) Object.assign(stored, { el: null, obsRC: null });
+  if (stored.geo !== undefined && stored.geo !== geo) Object.assign(stored, { el: null, obsRC: null }, edge === 'st' || edge === 'ld' ? { link: null } : null);   // st / ld: the linked identity goes with the clicked cell
   LOCAL[edge] = Object.assign(stored, { geo });
   const loc = Object.assign(defLocal(edge), LOCAL[edge], o.local || {});
   if (loc.obsRC && !(loc.obsRC[0] >= 0 && loc.obsRC[0] < K.UMMA_M && loc.obsRC[1] >= 0 && loc.obsRC[1] < K.UMMA_N)) { loc.obsRC = null; LOCAL[edge].obsRC = null; }
   if (loc.which !== 'SFA' && loc.which !== 'SFB') loc.which = 'SFA';
+  if (loc.mode !== 'warp') loc.mode = 'lane';
   const blocks = (loc.which === 'SFA' ? K.SF_BLOCK_M : K.SF_BLOCK_N) / 128;
   loc.blk = cl(loc.blk, 0, blocks - 1); loc.step = cl(loc.step, 0, 4); loc.half = cl(loc.half, 0, 1); loc.atom = cl(loc.atom, 0, (E.tmaPerStore || 1) - 1);
   return { M, K, E, c, sel, loc };
@@ -1661,6 +1717,9 @@ function norm(edge, o) {
 /* ===================================================================================== */
 /* plan: panels (pure data + functions) for one edge                                       */
 const HUES = ['#cfe0f7', '#d4efe0', '#fbe1cf', '#f8f0c4', '#e7dcf7', '#f9d6e3', '#d3f1f4', '#ececcf'];
+/* swap st Lane 视图: one fill per values[j] of the selected lane (source box + its BF16 target); no green, green = address outline */
+const VCOL = ['#e15759', '#f28e2b', '#edc948', '#4e79a7', '#b07aa1', '#ff9da7', '#76b7b2', '#9c755f'];
+const VINK = ['#111', '#111', '#111', '#fff', '#111', '#111', '#111', '#111'];   // text on each fill, contrast ≥ 4.5
 /* .thread(lane, warp) attaches a "选择该线程" target (shown only on SIMT edges) */
 function kvInfo(title, kv, src) { const o = { title, kv: kv.filter(Boolean), src: src || [], owner: null }; o.thread = (l, w) => { o.owner = { l, w }; return o; }; return o; }
 const fmtD = (d, M) => `D[${d[0]}, ${d[1]}]` + (d[0] < M.m && d[1] < M.desc.n ? '' : '（超出 [M,N]）');
@@ -1695,8 +1754,17 @@ function planLd(N) {
       facts: [['shape', '32 lanes × 32 bit × .x8 = 每线程 8 个 b32'], ['本 tile 次数', `每 warp ${E.storesPerTile} 片段 × ${E.innerIters} 次 i`], ['累加槽', `acc=${c.acc} → 列基址 ${c.acc * K.UMMA_N}`]],
       controls: ['rg.w', 'rg.l', 'rg.s', 'rg.i'] };
   }
-  const th = ldSwap(M, c, w, l), UN = K.UMMA_N, sel0 = N.loc.half;
-  /* one selected tcgen05.ld.16x256b.x1 writes values[4h..4h+3] only; the other call is secondary context */
+  const th = ldSwap(M, c, w, l), UN = K.UMMA_N, sel0 = N.loc.half, warp = N.loc.mode === 'warp';
+  /* context of a clicked cell / linked element: workload/tile/acc/s/i/warp/half; any other context drops it */
+  const ctxKey = (ww, ii, ss) => [M.m, M.desc.n, K.BLOCK_M, K.BLOCK_N, t.mb, t.nb, c.acc, ss === undefined ? c.s : ss, ii, ww, sel0].join('|');
+  const elKey = ctxKey(w, c.i, c.s);
+  /* linked selection (step ⑥ infrastructure): ONE source FP32 element = (warp, s, i, thread lane, values[j]); a click in
+   * tmem / zoom / reg stores it in LOCAL.ld.link under its owner's context; Lane 视图 additionally requires lane == owner */
+  let link = N.loc.link;
+  if (link && !(link.key === elKey && (warp || link.lane === l))) { link = null; N.loc.link = N.loc.el = null; if (LOCAL.ld) Object.assign(LOCAL.ld, { link: null, el: null }); }
+  if (N.loc.el && N.loc.el.k !== elKey) { N.loc.el = null; if (LOCAL.ld) LOCAL.ld.el = null; }
+  /* one selected tcgen05.ld.16x256b.x1 writes values[4h..4h+3] only; the other call is secondary context.
+   * Warp 视图: no per-lane own/ctx overlays in the TMEM panels (only this load's range vs the other load's range). */
   const ownSet = new Map(th.regs.filter(x => x.load === sel0).map(x => [x.lane + ':' + (x.col - c.acc * UN), x]));
   const ctxSet = new Map(th.regs.filter(x => x.load !== sel0).map(x => [x.lane + ':' + (x.col - c.acc * UN), x]));
   const inLoad = (h, r, cc) => cc >= th.colRel0 && cc < th.colRel0 + 8 && r >= th.loads[h].lanes[0] && r <= th.loads[h].lanes[1];
@@ -1704,32 +1772,64 @@ function planLd(N) {
     rows: 128, cols: UN, rlab: r => r % 16 === 0 ? String(r) : null, clab: cc => cc % 16 === 0 ? String(c.acc * UN + cc) : null,
     status: (r, cc) => t.n0 + r < M.desc.n && t.m0 + cc < M.m ? 'ok' : 'junk', hue: (r, cc) => (cc >> 4) & 7,
     inst: (r, cc) => inLoad(sel0, r, cc), alt: (r, cc) => inLoad(1 - sel0, r, cc),
-    own: (r, cc) => ownSet.has(r + ':' + cc), ctx: (r, cc) => ctxSet.has(r + ':' + cc),
+    own: warp ? null : (r, cc) => ownSet.has(r + ':' + cc), ctx: warp ? null : (r, cc) => ctxSet.has(r + ':' + cc),
     bands: range(4).map(q => ({ r0: 32 * q, r1: 32 * q + 31, c0: 0, c1: UN - 1, label: `warp ${4 + q} 分区` })),
     info: (r, cc) => { const col = c.acc * UN + cc, m = t.m0 + cc, n = t.n0 + r, li = r & 31, j = 4 * (li >> 4) + 2 * ((li >> 3) & 1) + (cc & 1), T = 4 * (li & 7) + ((cc - 16 * c.s - 8 * c.i) >> 1);
       const inWin = cc >= th.colRel0 && cc < th.colRel0 + 8;
       const I = kvInfo(`TMEM lane ${r}, column ${col}`, [['逻辑', fmtD([m, n], M)], ...tmemKV(r, col), ['类型', 'FP32'], ['状态', ST[t.n0 + r < M.desc.n && m < M.m ? 'ok' : 'junk']],
-        ['由谁读取', inWin ? `warp ${4 + (r >> 5)} lane ${T} 的 values[${j}]（第 ${(li >> 4) + 1} 条 16x256b；lane = lane_idx/4 + 8·((j/2)%2) + 16·(j/4)，col = 2·(lane_idx%4) + j%2）` : `片段 s=${cc >> 4}, i=${(cc & 15) >> 3} 时由 warp ${4 + (r >> 5)} 读取（当前 s/i 不读这一列）`]], [SRC.ld16, SRC.ld16ptx]);
+        ['由谁读取', inWin ? `warp ${4 + (r >> 5)} lane ${T} 的 values[${j}]（第 ${(li >> 4) + 1} 条 16x256b；lane = lane_idx/4 + 8·((j/2)%2) + 16·(j/4)，col = 2·(lane_idx%4) + j%2）` : `片段 s=${cc >> 4}, i=${(cc & 15) >> 3} 时由 warp ${4 + (r >> 5)} 读取（当前 s/i 不读这一列）`],
+        inWin ? ['本条指令', (li >> 4) === sel0 ? `是：所选第 ${sel0 + 1} 条 16x256b 读取它` : `否：属于另一条（第 ${(li >> 4) + 1} 条）16x256b，不是所选第 ${sel0 + 1} 条的输出`] : null], [SRC.ld16, SRC.ld16ptx]);
       return inWin ? I.thread(T, 4 + (r >> 5)) : I; } };
   const zoom = { id: 'zoom', title: `放大：warp ${w} 分区 32 lane × 8 列（列 ${th.cols[0]}..${th.cols[1]}），与左图同一数据`, sub: '格内 = 读到它的线程.寄存器；同一线程的值分散在多个 lane × 2 列，不是“一线程一行”',
     rows: 32, cols: 8, cw: 46, ch: 15, rlab: r => String(32 * p + r), clab: cc => String(th.cols[0] + cc),
     status: (r, cc) => t.n0 + 32 * p + r < M.desc.n && t.m0 + th.colRel0 + cc < M.m ? 'ok' : 'junk',
     inst: r => r >= 16 * sel0 && r < 16 * sel0 + 16, alt: r => !(r >= 16 * sel0 && r < 16 * sel0 + 16),
-    own: (r, cc) => ownSet.has((32 * p + r) + ':' + (th.colRel0 + cc)), ctx: (r, cc) => ctxSet.has((32 * p + r) + ':' + (th.colRel0 + cc)),
+    own: warp ? null : (r, cc) => ownSet.has((32 * p + r) + ':' + (th.colRel0 + cc)), ctx: warp ? null : (r, cc) => ctxSet.has((32 * p + r) + ':' + (th.colRel0 + cc)),
     text: (r, cc) => { const T = 4 * (r & 7) + (cc >> 1), j = 4 * (r >> 4) + 2 * ((r >> 3) & 1) + (cc & 1); return `T${T}.v${j}`; },
     info: (r, cc) => tm.info(32 * p + r, th.colRel0 + cc) };
   const lo = 4 * sel0, hi = lo + 3, inSel = j => j >= lo && j <= hi;
-  const reg = regPanel(N, 'reg', `目标：warp ${w} 寄存器（所选第 ${sel0 + 1} 条只写 values[${lo}..${hi}]；淡色 = 另一条写的 values[${4 - lo}..${7 - lo}]）`, 8, (L, j) => ldSwap(M, c, w, L).regs[j], l, 'values',
-    { inst: (r, j) => inSel(j), alt: (r, j) => !inSel(j), own: (r, j) => r === l && inSel(j), ctx: (r, j) => r === l && !inSel(j) });
+  /* target: the same boxed register component as step ⑥ (regBoxHTML via box:true). All 8 columns are shown for context;
+   * only values[lo..hi] are written by the selected load (strong), the other 4 are muted context (ctxCol). Colour = values[j]. */
+  const lds = range(32).map(L => ldSwap(M, c, w, L));
+  /* element ↔ panel mapping (ldSwap / CUTLASS 16x256b DstLayout, both ways). TMEM lane r, column cc (relative to acc·UMMA_N):
+   * warp = firstWarp + r/32, s = cc/16, i = (cc%16)/8, thread = 4·(r%8) + (cc%8)/2, j = 4·((r%32)/16) + 2·((r%16)/8) + cc%2.
+   * Cells no epilogue warp / fragment reads return null (no invented register). */
+  const tmOwner = (r, cc) => { const q = r >> 5, s = cc >> 4, i = (cc & 15) >> 3, li = r & 31;
+    if (q >= E.warps || s >= E.storesPerTile || i >= E.innerIters) return null;
+    return { w: E.firstWarp + q, s, i, lane: 4 * (li & 7) + ((cc & 7) >> 1), j: 4 * (li >> 4) + 2 * ((li >> 3) & 1) + (cc & 1) }; };
+  const fromPanel = (pid, r, cc) => pid === 'reg' ? { w, s: c.s, i: c.i, lane: r, j: cc } : pid === 'zoom' ? tmOwner(32 * p + r, th.colRel0 + cc) : pid === 'tmem' ? tmOwner(r, cc) : null;
+  const toPanels = (L, j) => { const x = lds[L].regs[j], col = x.col - c.acc * UN; return { reg: [L, j], tmem: [x.lane, col], zoom: [x.lane - 32 * p, col - th.colRel0] }; };
+  const linkSel = link ? Object.assign(toPanels(link.lane, link.j), { meta: { lane: link.lane, j: link.j } }) : null;
+  const linkOther = !!link && (link.j >> 2) !== sel0;
+  const regBase = regPanel(N, 'reg', '', 8, (L, j) => lds[L].regs[j], l, 'values'), baseInfo = regBase.info;
+  const reg = Object.assign(regBase, { box: true, mode: warp ? 'warp' : 'lane', lane: l, unit: 'FP32 · 32 bit',
+    title: `目标：warp ${w} 寄存器 values[0..7]（FP32）· 所选第 ${sel0 + 1} 条只写 values[${lo}..${hi}]`,
+    sub: (warp ? `Warp 视图：实色 = 本条 32 线程 × 4 = 128 个 FP32（512B）；淡色虚框 = 另一条写的 values[${4 - lo}..${7 - lo}]（上下文）`
+      : `Lane 视图：彩色 = 所选 Thread ${l}，实色 = 本条写的 4 个，淡色 = 另一条写的 4 个`) + '；每格 = 1 个 FP32（32 bit）；悬停 / 点击看 TMEM 来源',
+    rlab: r => `Thread ${r}`, clab: j => `values[${j}]`, ch: undefined, cw: undefined,
+    inst: (r, j) => inSel(j), own: warp ? (r, j) => inSel(j) : (r, j) => r === l && inSel(j),
+    vcol: warp ? (r, j) => j : (r, j) => r === l ? j : null, ctxCol: j => !inSel(j),
+    text: (r, j) => { const x = lds[r].regs[j]; return [`TMEM lane ${x.lane}, col ${x.col}`, `第 ${x.load + 1} 条 16x256b${inSel(j) ? '（本条写入）' : '（另一条写入，上下文）'}`, fmtD(x.d, M)]; },
+    data: (r, j) => { const x = lds[r].regs[j]; return { lane: r, reg: j, dtype: 'fp32', bits: 32, load: x.load, active: inSel(j) ? 1 : 0, tmlane: x.lane, tmcol: x.col, d: x.d.join(',') }; },
+    info: (r, j) => { const I = baseInfo(r, j); I.kv.splice(3, 0, ['本条指令', inSel(j) ? `是：所选第 ${sel0 + 1} 条 16x256b 写入 values[${lo}..${hi}]` : `否：由另一条（第 ${2 - sel0} 条）写入，此处仅作上下文`]); I.kv = I.kv.map(kv => kv[0] === '类型' ? ['类型', 'FP32（32 bit = 4B）'] : kv); return I; } });
   const mark = h => h === sel0 ? '   ◀ 所选' : '';
-  return { title: `tcgen05.ld 16x256b（第 ${sel0 + 1}/2 条）：TMEM → 寄存器（swap，warp ${w}，s=${c.s}，i=${c.i}）`, simt: true,
+  return { title: `tcgen05.ld 16x256b（第 ${sel0 + 1}/2 条）：TMEM → 寄存器（swap，warp ${w}${warp ? ' · Warp 视图' : `，lane ${l}`}，s=${c.s}，i=${c.i}）`, simt: true,
+    mode: reg.mode, vcolors: true, addrOutline: false, elKey,
+    linkNote: '红框 = 联动选中：点击 TMEM 全图 / 放大 / 寄存器任一视图中的元素，三个视图同时标出同一个 FP32（thread, values[j]）'
+      + (linkOther ? `；当前选中的 values[${link.j}] 属于另一条（第 ${2 - sel0} 条）16x256b，不是所选第 ${sel0 + 1} 条的输出` : ''),
+    link: { sel: link ? { w, s: c.s, i: c.i, lane: link.lane, j: link.j, load: link.j >> 2, active: !linkOther } : null, ctxKey, fromPanel, toPanels },
+    linkSel, linkKey: link ? `${link.key}|${link.lane}|${link.j}` : null,
+    vlegLabel: warp ? `颜色=values[j]下标；本条只写 [${lo}]..[${hi}]，淡色 = 另一条：` : `所选 lane 的 values[j]（本条只写 [${lo}]..[${hi}]，淡色 = 另一条）：`,
+    ownLabel: warp ? null : '所选线程在本条指令中的元素（TMEM 视图）',
+    legendNote: `FP32（32 bit）；一条 16x256b：每线程 4 个，warp 共 128 个 = 512B`,
     ptx: [`tcgen05.ld.sync.aligned.16x256b.x1.b32 {values[0..3]}, [${hex(th.loads[0].taddr)}];   // lane +0..15${mark(0)}`, `tcgen05.ld.sync.aligned.16x256b.x1.b32 {values[4..7]}, [${hex(th.loads[1].taddr)}];   // | 0x00100000：lane +16..31${mark(1)}`, 'tcgen05.wait::ld.sync.aligned;'],
-    issuer: `所选第 ${sel0 + 1} 条 16x256b：warp ${w} 的 32 个线程共同读取 lane ${th.loads[sel0].lanes[0]}..${th.loads[sel0].lanes[1]} × 8 列（512B），每线程只写 4 个寄存器 values[${lo}..${hi}]；线程 ${l} 这 4 个值来自 lane ${[...new Set(th.regs.filter(x => x.load === sel0).map(x => x.lane))].join('/')}。另一条写 values[${4 - lo}..${7 - lo}]，两条合起来才是 epilogue 的 8 值片段。`,
-    flow: [{ group: 'src', title: '源：TMEM（全图与本 warp 放大是同一数据的两种视图）', views: [tm, zoom] }, { proc: [`16x256b.x1 第 ${sel0 + 1} 条`, `lane ${th.loads[sel0].lanes[0]}..${th.loads[sel0].lanes[1]}`, `列 ${th.cols[0]}..${th.cols[1]}`, `→ values[${lo}..${hi}]`] }, reg],
-    thread: { head: ['寄存器', '来自第几条', 'TMEM 位置', 'taddr', '逻辑元素', '状态'], rows: th.regs.map(x => [x.name + (x.load === sel0 ? ' ★' : ''), String(x.load + 1) + (x.load === sel0 ? '（所选）' : '（另一条）'), `lane ${x.lane}, col ${x.col}`, hex(x.taddr), fmtD(x.d, M), x.status]) }, map: th,
+    issuer: warp ? `所选第 ${sel0 + 1} 条 16x256b：warp ${w} 的 32 个线程共同读取 lane ${th.loads[sel0].lanes[0]}..${th.loads[sel0].lanes[1]} × 8 列（512B），每线程只写 4 个寄存器 values[${lo}..${hi}]，整个 warp 共 128 个 FP32。另一条写 values[${4 - lo}..${7 - lo}]，两条合起来才是 epilogue 的 8 值片段。`
+      : `所选第 ${sel0 + 1} 条 16x256b：warp ${w} 的 32 个线程共同读取 lane ${th.loads[sel0].lanes[0]}..${th.loads[sel0].lanes[1]} × 8 列（512B），每线程只写 4 个寄存器 values[${lo}..${hi}]；线程 ${l} 这 4 个值来自 lane ${[...new Set(th.regs.filter(x => x.load === sel0).map(x => x.lane))].join('/')}。另一条写 values[${4 - lo}..${7 - lo}]，两条合起来才是 epilogue 的 8 值片段。`,
+    flow: [{ group: 'src', title: '源：TMEM（全图与本 warp 放大是同一数据的两种视图）', views: [tm, zoom] }, { proc: [`16x256b.x1 第 ${sel0 + 1} 条`, `lane ${th.loads[sel0].lanes[0]}..${th.loads[sel0].lanes[1]}`, `列 ${th.cols[0]}..${th.cols[1]}`, `→ values[${lo}..${hi}]`, warp ? '128 × FP32（512B）' : '每线程 4 × FP32'] }, reg],
+    thread: warp ? null : { head: ['寄存器', '来自第几条', 'TMEM 位置', 'taddr', '逻辑元素', '状态'], rows: th.regs.map(x => [x.name + (x.load === sel0 ? ' ★' : ''), String(x.load + 1) + (x.load === sel0 ? '（所选）' : '（另一条）'), `lane ${x.lane}, col ${x.col}`, hex(x.taddr), fmtD(x.d, M), x.status]) }, map: th,
     selectedRegs: [lo, hi],
     facts: [['16x256b 片段', 'thread T, reg j → lane T/4 + 8·((j/2)%2)（+16 第 2 条）, col 2·(T%4) + j%2（CUTLASS DstLayout）'], ['累加槽', `acc=${c.acc} → 列基址 ${c.acc * UN}`]],
-    controls: ['rg.w', 'rg.l', 'rg.s', 'rg.i', 'loc.half'] };
+    controls: ['loc.mode', 'rg.w', 'rg.l', 'rg.s', 'rg.i', 'loc.half'] };
 }
 /* register-file panel: 32 lanes × n values of one warp; ov overrides the default layers (whole warp = instruction, selected lane = owner) */
 function regPanel(N, id, title, n, get, selLane, nm, ov) {
@@ -1765,37 +1865,97 @@ function planSt(N) {
       facts: [['swizzle', `${Sz}B（STORE_BLOCK_N=${C}）：smem = ew·32·${Sz} + row·128 + (col ⊕ row%${Sz / 16})·16`], ['本 warp 一次', `32 线程 × 16B = 512B`]],
       controls: ['rg.w', 'rg.l', 'rg.s', 'rg.i'] };
   }
-  const th = stSwap(M, c, w, l), R = 16, C = K.BLOCK_N, m0 = t.m0 + c.s * R;
+  /* swap: loc.mode = 'lane' (selected lane: values[j] colours + green address outline) | 'warp' (all 32 lanes' data, no per-lane address overlay).
+   * The instruction is always the whole-warp stmatrix; the mode only changes what is highlighted / described. */
+  const th = stSwap(M, c, w, l), R = 16, C = K.BLOCK_N, m0 = t.m0 + c.s * R, warp = N.loc.mode === 'warp', ew = th.ew;
   const stat = (r, n) => m0 + r < M.m && t.n0 + n < M.desc.n ? 'ok' : 'clip';
-  const ownSet = new Set(th.elems.map(e => e.logical.join(':')));
+  const inWarp = (r, n) => r >= th.warpRange.rows[0] && r <= th.warpRange.rows[1] && n >= th.warpRange.cols[0] && n <= th.warpRange.cols[1];
+  /* target cells are filled with the colour of their source register index values[j] (vcol): Lane 视图 only the selected lane's
+   * 8 elements, Warp 视图 all 256 elements of this warp/i (j = swapOwner(rr, n).reg = 2k + h). Lane 视图 also draws the address
+   * row as a green outline above the fills (auxOutline); Warp 视图 has no per-lane address overlay. */
+  const vmap = new Map(th.elems.map(e => [e.logical.join(':'), e.reg]));
+  const vcolD = warp ? (r, n) => inWarp(r, n) ? swapOwner(r, n).reg : null : (r, n) => { const j = vmap.get(r + ':' + n); return j === undefined ? null : j; };
+  const laneMarks = f => ({ vcol: (r, n) => { const v = f(r, n); return v ? vcolD(v[0], v[1]) : null; }, vdst: (r, n) => { const v = f(r, n); return v ? v.join(',') : ''; }, auxOutline: !warp });
   const addrSet = (r, n) => r === th.addrRow.rr && n >= th.addrRow.nCols[0] && n <= th.addrRow.nCols[1];
   const elemInfo = (r, n) => { const rel = cdSwapElemRel(r, n), abs = base + rel, o = swapOwner(r, n);
-    return kvInfo(`输出槽 ${c.out} 逻辑 [${r}, ${n}]`, [['逻辑', `${fmtD([m0 + r, t.n0 + n], M)}；片段 s=${c.s} 内 (row ${r}, col ${n})`], ...smemKV(abs, rel, `smem_cd[${c.out}]`), ['类型', 'BF16'], ['状态', ST[stat(r, n)]],
-      ['数据来自', `warp ${4 + o.warpRel} lane ${o.lane} 的 p${o.k}（${o.half ? '高' : '低'} 16 位 = bf16(values[${o.reg}])），i=${o.i}`],
-      ['行地址由', `同 warp lane ${o.addrLane}（stmatrix 矩阵 ${o.k} 第 ${r & 7} 行）提供 —— 跨 lane`],
+    return kvInfo(`输出槽 ${c.out} 逻辑 [${r}, ${n}]`, [['逻辑', `${fmtD([m0 + r, t.n0 + n], M)}；片段 s=${c.s} 内 (row ${r}, col ${n})`], ...smemKV(abs, rel, `smem_cd[${c.out}]`), ['类型', 'BF16（16 bit = 2B）'], ['状态', ST[stat(r, n)]],
+      ['数据来自', `warp ${4 + o.warpRel} lane ${o.lane} 的 p${o.k}（${o.half ? '高' : '低'} 16 位 = bf16(values[${o.reg}])，源为 FP32），i=${o.i}`],
+      warp ? null : ['行地址由', `同 warp lane ${o.addrLane}（stmatrix 矩阵 ${o.k} 第 ${r & 7} 行）提供 —— 跨 lane`],
       ['布局', `atom ${n >> 6}：${n >> 6}·2048 + r·128 + 16·(((n%64)/8) ⊕ (r%8)) + 2·(n%8) = ${rel}`]], [SRC.stsm, SRC.stsmptx]).thread(o.lane, 4 + o.warpRel); };
-  const logical = { id: 'cdl', title: `目标（逻辑）：输出槽 ${c.out} = 片段 s=${c.s}：原 D 的 16 行 × ${C} 列`, sub: `行 = m−${m0}，列 = n−${t.n0}；橙 = 本线程数据去向，绿 = 本 lane 提供地址的那一行 16B`, rows: R, cols: C, cw: 4, ch: 12,
+  const logical = Object.assign({ id: 'cdl', title: `目标（逻辑）：输出槽 ${c.out} = 片段 s=${c.s}：原 D 的 16 行 × ${C} 列 BF16（每格 16 bit）`,
+    sub: `行 = m−${m0}，列 = n−${t.n0}；` + (warp ? `填色 = warp ${w} 全部 32 lane 的数据落点（8×32 = 256 个 BF16 = 512B），颜色 = 源 values[j] 下标` : '填色 = 本线程 values[j] 的落点（颜色见图例），绿色边框 = 本 lane 提供地址的那一行 16B'), rows: R, cols: C, cw: 4, ch: 12,
     rlab: r => r % 4 === 0 ? String(r) : null, clab: n => n % 32 === 0 ? String(n) : null, status: stat, hue: (r, n) => (n >> 3) & 7,
-    inst: (r, n) => r >= th.warpRange.rows[0] && r <= th.warpRange.rows[1] && n >= th.warpRange.cols[0] && n <= th.warpRange.cols[1],
-    own: (r, n) => ownSet.has(r + ':' + n), aux: addrSet,
-    bands: [0, 1].map(a => ({ r0: 0, r1: 15, c0: 64 * a, c1: 64 * a + 63, label: `atom ${a}（warp ${4 + 2 * a}/${5 + 2 * a}）` })), info: elemInfo };
-  const zoom = { id: 'zoom', title: `放大：warp ${w} 本次 stmatrix 写的 8 行 × 32 列`, sub: `格内 = 提供数据的 lane（p_k 由列组决定，lo/hi 由行奇偶决定；点击看完整来源）；第 r 行 16B 的地址由 lane 8k+r 提供`, rows: 8, cols: 32, cw: 20, ch: 15,
+    inst: inWarp, own: null, aux: warp ? null : addrSet,
+    bands: [0, 1].map(a => ({ r0: 0, r1: 15, c0: 64 * a, c1: 64 * a + 63, label: `atom ${a}（warp ${4 + 2 * a}/${5 + 2 * a}）` })), info: elemInfo }, laneMarks((r, n) => [r, n]));
+  const zoom = Object.assign({ id: 'zoom', title: `放大：warp ${w} 本次 stmatrix 写的 8 行 × 32 列 BF16（每格 16 bit）`,
+    sub: '格内 = 提供数据的 lane（p_k 由列组决定，lo/hi 由行奇偶决定；点击看完整来源）' + (warp ? `；Warp 视图：256 个 BF16 全部是 warp ${w} 本条指令的数据，颜色 = 源 values[j] 下标` : '；第 r 行 16B 的地址由 lane 8k+r 提供'), rows: 8, cols: 32, cw: 20, ch: 15,
     rlab: r => `m${8 * c.i + r}${r & 1 ? 'h' : 'l'}`, clab: n => n % 8 === 0 ? `p${n >> 3}·n${th.warpRange.cols[0] + n}` : null,
     status: (r, n) => stat(8 * c.i + r, th.warpRange.cols[0] + n), inst: () => true,
-    own: (r, n) => ownSet.has((8 * c.i + r) + ':' + (th.warpRange.cols[0] + n)), aux: (r, n) => addrSet(8 * c.i + r, th.warpRange.cols[0] + n),
+    own: null, aux: warp ? null : (r, n) => addrSet(8 * c.i + r, th.warpRange.cols[0] + n),
     text: (r, n) => String(swapOwner(8 * c.i + r, th.warpRange.cols[0] + n).lane),
-    info: (r, n) => elemInfo(8 * c.i + r, th.warpRange.cols[0] + n) };
+    info: (r, n) => elemInfo(8 * c.i + r, th.warpRange.cols[0] + n) }, laneMarks((r, n) => [8 * c.i + r, th.warpRange.cols[0] + n]));
   const inv = invTable(R * C * 2, 2, f => { for (let r = 0; r < R; r++) for (let n = 0; n < C; n++) f(r, n, cdSwapElemRel(r, n)); });
-  const phys = physPanel('cdp', `目标（物理）：smem_cd[${c.out}] @ ${base}，2 个 16×64 atom（各 2048B）`, '一格 = 1 BF16；颜色 = 逻辑 8 列组', inv, R * C * 2,
-    v => stat(v[0], v[1]), v => (v[1] >> 3) & 7, v => logical.inst(v[0], v[1]), v => ownSet.has(v[0] + ':' + v[1]), v => elemInfo(v[0], v[1]), base, v => addrSet(v[0], v[1]));
-  const reg = regPanel(N, 'reg', `源：warp ${w} 寄存器 values[0..7]（FP32，来自两条 16x256b）`, 8, (L, j) => ldSwap(M, c, w, L).regs[j], l, 'values');
-  return { title: `cvt + stmatrix.x4.trans：寄存器 → 输出 SMEM（swap，warp ${w} lane ${l}，s=${c.s}，i=${c.i}）`, simt: true,
+  /* physical inspector: same element info, plus slot-relative bytes, slot base / absolute bytes, bank and byte pair inside the bank */
+  const physInfo = (r, n) => { const I = elemInfo(r, n), rel = cdSwapElemRel(r, n), abs = base + rel, q = rel & 3;
+    I.kv.splice(1, 0, ['物理位置', `槽内相对字节 ${rel}..${rel + 1}（第 ${rel >> 7} 行，行起始 ${rel & ~127}，行内字节 ${rel & 127}..${(rel & 127) + 1}）`],
+      ['槽基址 / 绝对', `slot base = smem_base + ${base}（${hex(base)}）→ 绝对 smem_base + ${abs}..${abs + 1}（${hex(abs)}）`],
+      ['bank / 字节', `bank ${(rel >> 2) & 31} = (相对字节 ${rel} ≫ 2) & 31；占该 bank 的字节 ${q}..${q + 1}（${q ? 'bank 内后 2B' : 'bank 内前 2B'}，每 bank 4B = 2 个 BF16）`]);
+    return I; };
+  /* swap cdp: 32 rows × 128B, 2B cells (rows 32, cols 64 unchanged); bank header / separators via bankLayout; colour = source values[j] */
+  const phys = Object.assign(physPanel('cdp', `目标（物理）：smem_cd[${c.out}]，slot base = smem_base + ${base}（${hex(base)}）· 32 行 × 128B，横轴 = bank 0..31（每 bank 4B = 2 个 BF16；单个 BF16 = 2B）`,
+    `行标 = 槽内相对起始字节（0, 128, …, ${R * C * 2 - 128}）；一格 = 1 个 BF16 = bank 内 2 个字节（字节刻度 0..3，粗线 = bank 边界，虚线 = 同一 bank 内两个 BF16 的分界）；`
+      + (warp ? `填色 = 源 values[j] 下标，覆盖 warp ${w} 本次 256 个 BF16` : '填色 = 所选 lane 的 values[j]，绿色边框 = 本 lane 提供地址的 16B') + '；淡蓝 = 本 warp 本次写入范围',
+    inv, R * C * 2, v => stat(v[0], v[1]), v => null, v => inWarp(v[0], v[1]), v => false, v => physInfo(v[0], v[1]), base, warp ? null : v => addrSet(v[0], v[1])),
+    laneMarks((r, cc) => inv[r * 64 + cc]), { cw: 14, ch: 12, hue: null, bankLayout: { cellBytes: 2 }, rlab: r => String(r * 128), clab: () => null, rowAxis: '槽内相对字节', colAxis: 'bank' });
+  /* source: boxed register file (rendered by regBoxHTML, not gridSVG): every Thread × values[j] cell is its own FP32 box */
+  const lds = range(32).map(L => ldSwap(M, c, w, L));
+  const dstOf = (L, j) => { const k = j >> 1, h = j & 1, rr = 8 * c.i + 2 * (L & 3) + h, n = 32 * ew + 8 * k + (L >> 2), rel = cdSwapElemRel(rr, n);
+    return { k, h, rr, n, rel, abs: base + rel, addrLane: 8 * k + (rr & 7) }; };
+  const reg = { id: 'reg', box: true, title: `源：warp ${w} 寄存器 values[0..7]（FP32，来自两条 16x256b）`,
+    sub: (warp ? `Warp 视图：32 线程 × 8 = 256 个 FP32（1024B），颜色 = values[j] 下标（每色 32 个）` : `Lane 视图：彩色 = 所选 Thread ${l} 的 values[0..7]，与目标落点同色`)
+      + '；每格 = 1 个 FP32（32 bit）；悬停 / 点击看 D 坐标与去向',
+    rows: 32, cols: 8, rlab: r => `Thread ${r}`, clab: j => `values[${j}]`, unit: 'FP32 · 32 bit', mode: warp ? 'warp' : 'lane', lane: l,
+    status: (r, j) => lds[r].regs[j].status === 'ok' ? 'ok' : 'junk', inst: () => true, own: warp ? () => true : r => r === l, vcol: warp ? (r, j) => j : (r, j) => r === l ? j : null,
+    text: (r, j) => { const x = lds[r].regs[j], d = dstOf(r, j); return [`D[${x.d[0]}, ${x.d[1]}]`, `→ p${d.k}.${d.h ? 'hi' : 'lo'} → BF16 [${d.rr}, ${d.n}]`]; },
+    data: (r, j) => { const x = lds[r].regs[j], d = dstOf(r, j); return { lane: r, reg: j, dtype: 'fp32', bits: 32, d: x.d.join(','), dst: d.rr + ',' + d.n, k: d.k, half: d.h }; },
+    info: (r, j) => { const x = lds[r].regs[j], d = dstOf(r, j);
+      return kvInfo(`warp ${w} lane ${r} 的 values[${j}]`, [['逻辑', fmtD(x.d, M)], ['位置', '寄存器（每线程私有，无地址/bank）'], ['类型', 'FP32（32 bit = 4B）'], ['状态', ST[x.status]],
+        ['来源', `TMEM lane ${x.lane}, col ${x.col}（第 ${x.load + 1} 条 16x256b）`],
+        ['转换', `cvt.rn.bf16x2.f32 → p${d.k} 的${d.h ? '高' : '低'} 16 位 = BF16（16 bit = 2B）`],
+        ['去向', `smem_cd[${c.out}] 逻辑 [${d.rr}, ${d.n}]（stmatrix 矩阵 ${d.k}）：smem_base + ${d.abs}（${hex(d.abs)}），bank ${bank(d.abs)}`],
+        warp ? null : ['行地址由', `同 warp lane ${d.addrLane}（矩阵 ${d.k} 第 ${d.rr & 7} 行）提供`]], [SRC.ld16, SRC.stsm, SRC.stsmptx]).thread(r, w); } };
+  /* linked selection: ONE canonical element = source (lane, values[j]) of warp w, iteration i, in this workload/tile/acc/slot/s.
+   * A click in any of reg / zoom / cdl / cdp stores it in LOCAL.st.link (key = context it belongs to); every panel then marks
+   * its own coordinates of that element. Any context change not made by the click itself (key mismatch, or a different
+   * lane in Lane 视图) drops it together with the clicked cell, so no stale red mark can survive. */
+  const ctxKey = (ww, ii) => [M.m, M.desc.n, K.BLOCK_M, K.BLOCK_N, t.mb, t.nb, c.acc, c.out, c.s, ww, ii].join('|');
+  const toPanels = (L, j) => { const d = dstOf(L, j); return { reg: [L, j], zoom: [d.rr - 8 * c.i, d.n - 32 * ew], cdl: [d.rr, d.n], cdp: [d.rel >> 7, (d.rel & 127) >> 1] }; };
+  const ownerOf = (rr, n) => { const o = swapOwner(rr, n); return { w: E.firstWarp + o.warpRel, i: o.i, lane: o.lane, j: o.reg }; };
+  const fromPanel = (p, r, cc) => { if (p === 'reg') return { w, i: c.i, lane: r, j: cc }; if (p === 'zoom') return ownerOf(8 * c.i + r, 32 * ew + cc);
+    if (p === 'cdl') return ownerOf(r, cc); const v = p === 'cdp' ? inv[r * 64 + cc] : null; return v ? ownerOf(v[0], v[1]) : null; };
+  let link = N.loc.link;
+  if (link && !(link.key === ctxKey(w, c.i) && (warp || link.lane === l))) { link = null; N.loc.link = N.loc.el = null; if (LOCAL.st) Object.assign(LOCAL.st, { link: null, el: null }); }
+  const linkSel = link ? Object.assign(toPanels(link.lane, link.j), { meta: { lane: link.lane, j: link.j } }) : null;
+  const head = { title: `cvt + stmatrix.x4.trans：寄存器 → 输出 SMEM（swap，warp ${w} ${warp ? '整个 warp · Warp 视图' : `lane ${l}`}，s=${c.s}，i=${c.i}）`, simt: true, mode: reg.mode, vcolors: true, addrOutline: !warp,
+    vlegLabel: warp ? '颜色=values[j]下标；格内数字=数据来自的lane：' : '所选 lane 的 values[j]：',
+    legendNote: '源格 = FP32（32 bit）；目标格 = BF16（16 bit）', map: th, controls: ['loc.mode', 'rg.w', 'rg.l', 'rg.s', 'rg.i'],
+    linkNote: '红框 = 联动选中：点击任一视图（源寄存器 / 放大 / 逻辑 / 物理）中的元素，四个视图同时标出同一个元素（FP32 源 values[j] ↔ 转换后的 BF16 落点）；绿色边框仍只表示地址行',
+    link: { sel: link ? { w, i: c.i, lane: link.lane, j: link.j } : null, ctxKey, fromPanel, toPanels }, linkSel, linkKey: link ? `${link.key}|${link.lane}|${link.j}` : null };
+  const dst = { group: 'dst', title: `目标：输出 SMEM 槽 ${c.out}（放大 / 逻辑 / 物理是同一缓冲的三种视图）`, views: [zoom, logical, phys] };
+  if (warp) return Object.assign(head, {
+    ptx: ['cvt.rn.bf16x2.f32 p_k, v(2k+1), v(2k);   // k = 0..3，每 lane 4 条；整个 warp 128 个 packed u32', 'stmatrix.sync.aligned.x4.m8n8.shared.b16.trans [addr_lane], {p0, p1, p2, p3};   // addr_lane = 每个 lane 各自的 16B 行地址（逐 lane 地址见 Lane 视图）'],
+    issuer: `stmatrix 是 warp 集体指令：warp ${w} 的 32 个线程 × 8 个 FP32（256 × 32 bit = 1024B）→ 128 个 packed u32 → 256 个 BF16（512B），写成 4 个 8×8 BF16 矩阵 = 逻辑行 ${th.warpRange.rows[0]}..${th.warpRange.rows[1]} × 列 ${th.warpRange.cols[0]}..${th.warpRange.cols[1]}；颜色 = 源 values[j] 下标（j = 2k + h），不是 lane。`,
+    flow: [reg, { proc: ['256 × FP32（32 lane × 8，1024B）', '→ cvt.rn.bf16x2 ×128', '→ 128 × u32 packed', '→ stmatrix .x4.trans：', '4 个 8×8 矩阵，行 = m，列 = n', `→ 256 × BF16（512B）`] }, dst],
+    threadTitle: `warp ${w} 整体映射（4 个 8×8 矩阵）`,
+    thread: { head: ['矩阵 k', '源寄存器（32 lane）', 'packed', '目标逻辑范围', '元素', '字节'], rows: range(4).map(k => [`k=${k}`, `values[${2 * k}], values[${2 * k + 1}] × 32 = 64 × FP32`, `p${k} × 32 = 32 × u32`, `行 ${th.warpRange.rows[0]}..${th.warpRange.rows[1]}，列 ${32 * ew + 8 * k}..${32 * ew + 8 * k + 7}`, '64 × BF16', '128B'])
+      .concat([['合计', '256 × FP32（1024B）', '128 × u32', `行 ${th.warpRange.rows[0]}..${th.warpRange.rows[1]}，列 ${th.warpRange.cols[0]}..${th.warpRange.cols[1]}`, '256 × BF16', '512B']]) },
+    facts: [['本 warp 一次', '256 × FP32（1024B 寄存器）→ 128 × packed u32 → 256 × BF16 = 4 个 8×8 矩阵 = 512B'], ['地址', '每个 lane 提供 1 个 16B 行地址（32 行 = 4 矩阵 × 8 行）；逐 lane 地址只在 Lane 视图显示']] });
+  return Object.assign(head, {
     ptx: ['cvt.rn.bf16x2.f32 p_k, v(2k+1), v(2k);   // k = 0..3', `stmatrix.sync.aligned.x4.m8n8.shared.b16.trans [smem_base + ${th.addrRow.abs}], {p0, p1, p2, p3};   // 本 lane 提供矩阵 ${th.addrRow.matrix} 第 ${th.addrRow.row} 行地址`],
-    issuer: `stmatrix 是 warp 集体指令：lane ${l} 的 4 个 packed 寄存器写到 ${new Set(th.elems.map(e => e.addrLane)).size} 个不同 lane 提供的行地址；它自己提供的地址（绿色）接收 lane ${th.addrRow.fromLanes.join('/')} 的${th.addrRow.fromHalf ? '高' : '低'} 16 位。`,
-    flow: [reg, { proc: ['8 × FP32', '→ cvt.rn.bf16x2 ×4', '→ p0..p3（每个 = 同一 n 的相邻两 m）', '→ stmatrix .trans：', '矩阵 k 的行 = m，列 = n'] }, { group: 'dst', title: `目标：输出 SMEM 槽 ${c.out}（放大 / 逻辑 / 物理是同一缓冲的三种视图）`, views: [zoom, logical, phys] }],
-    thread: { head: ['packed.half', '寄存器', '逻辑元素', 'SMEM 字节', 'bank', '地址由 lane'], rows: th.elems.map(e => [`p${e.k}.${e.half ? 'hi' : 'lo'}`, `values[${e.reg}]`, fmtD(e.d, M), String(e.abs), String(e.bank), String(e.addrLane)]) }, map: th,
-    facts: [['本 lane 地址', `smem_base + ${th.addrRow.abs}（atom ${th.atom}，行 ${th.addrRow.rr}，n ${th.addrRow.nCols[0]}..${th.addrRow.nCols[1]}；bank ${th.addrRow.banks.join(',')}）`], ['本 warp 一次', '4 个 8×8 BF16 矩阵 = 512B']],
-    controls: ['rg.w', 'rg.l', 'rg.s', 'rg.i'] };
+    issuer: `stmatrix 是 warp 集体指令（整个 warp 32 线程一起执行）：lane ${l} 的 4 个 packed 寄存器写到 ${new Set(th.elems.map(e => e.addrLane)).size} 个不同 lane 提供的行地址；它自己提供的地址（绿色边框）接收 lane ${th.addrRow.fromLanes.join('/')} 的${th.addrRow.fromHalf ? '高' : '低'} 16 位。`,
+    flow: [reg, { proc: ['8 × FP32（32 bit）', '→ cvt.rn.bf16x2 ×4', '→ p0..p3（每个 = 同一 n 的相邻两 m）', '→ stmatrix .trans：', '矩阵 k 的行 = m，列 = n', '→ 8 × BF16（16 bit）'] }, dst],
+    thread: { head: ['packed.half', '寄存器（FP32）', '逻辑元素（BF16）', 'SMEM 字节', 'bank', '地址由 lane'], rows: th.elems.map(e => [`p${e.k}.${e.half ? 'hi' : 'lo'}`, `values[${e.reg}]`, fmtD(e.d, M), String(e.abs), String(e.bank), String(e.addrLane)]) },
+    facts: [['本 lane 地址', `smem_base + ${th.addrRow.abs}（atom ${th.atom}，行 ${th.addrRow.rr}，n ${th.addrRow.nCols[0]}..${th.addrRow.nCols[1]}；bank ${th.addrRow.banks.join(',')}）`], ['本 warp 一次', '256 × FP32 → 4 个 8×8 BF16 矩阵 = 512B']] });
 }
 /* inverse table: byte slot → logical [r,c] for physical panels */
 function invTable(bytes, eb, each) { const a = new Array(bytes / eb).fill(null); each((r, c, rel) => { a[rel / eb] = [r, c]; }); return a; }
@@ -1999,29 +2159,79 @@ function plan(edge, opts) {
 /* ===================================================================================== */
 /* rendering                                                                               */
 const SCLS = { ok: '', zero: 'zero', junk: 'junk', nond: 'nond', ext: 'ext', uninit: 'uninit', gpad: 'gpad', clip: 'clip', peer: 'peer' };
-function gridSVG(pn, sel) {
+/* optional physical bank overlay (pn.bankLayout = { cellBytes }): the cell grid is unchanged (hit-testing uses data-l/t/cw/ch),
+ * it only adds a two-row header (bank 0..31 over 4/cellBytes cells; byte ticks 0..3 inside each bank) and vertical separators:
+ * strong at bank boundaries, weak dashed between the elements of one bank. */
+function bankLayer(pn, Lm, Tm, cw, ch, rows, cols) {
+  const eb = pn.bankLayout.cellBytes, per = 4 / eb, bw = cw / eb, y1 = Tm + rows * ch;
+  let ln = '', hd = `<text class="bkc" x="${Lm - 3}" y="${Tm - 18}" text-anchor="end">bank</text><text class="bkc" x="${Lm - 3}" y="${Tm - 5}" text-anchor="end">byte</text>`;
+  for (let k = 0; k <= cols; k++) { const x = Lm + k * cw, b = k % per === 0; ln += `<line class="${b ? 'bk' : 'bh'}" x1="${x}" x2="${x}" y1="${b ? Tm - 28 : Tm - 12}" y2="${y1}"/>`; }
+  for (let t = 1; t < cols * eb; t++) if (t % eb) ln += `<line class="bt" x1="${Lm + t * bw}" x2="${Lm + t * bw}" y1="${Tm - 3}" y2="${Tm}"/>`;
+  for (let b = 0; b < cols / per; b++) { const x0 = Lm + b * per * cw;
+    hd += `<text class="bkn" x="${x0 + per * cw / 2}" y="${Tm - 17}" text-anchor="middle">${b}</text>`;
+    for (let q = 0; q < 4; q++) hd += `<text class="bkt" x="${x0 + (q + 0.5) * bw}" y="${Tm - 4}" text-anchor="middle">${q}</text>`; }
+  return `<g class="L-bank" data-iv-role="banks" data-banks="${cols / per}" data-bank-bytes="4" data-cell-bytes="${eb}">${ln}${hd}</g>`;
+}
+function gridSVG(pn, sel, meta) {
   const rows = pn.rows, cols = pn.cols;
   const cw = pn.cw || Math.max(2, Math.min(16, Math.floor(380 / cols))), ch = pn.ch || Math.max(rows <= 160 ? 3 : 2, Math.min(14, Math.floor(300 / rows)));
-  const Lm = 40, Tm = 18, W = Lm + cols * cw + 6, H = Tm + rows * ch + 6;
-  let base = '', hat = '', inst = '', alt = '', aux = '', ctx = '', own = '', txt = '', lab = '';
+  const Lm = 40, Tm = pn.bankLayout ? 32 : 18, W = Lm + cols * cw + 6, H = Tm + rows * ch + 6;
+  let base = '', hat = '', inst = '', alt = '', aux = '', ctx = '', own = '', txt = '', lab = '', vcol = '', auxo = '';
   const run = (r, f, emit) => { let c0 = 0, k0 = f(r, 0); for (let cc = 1; cc <= cols; cc++) { const k = cc < cols ? f(r, cc) : '\u0000'; if (k !== k0) { if (k0) emit(c0, cc - c0, k0); c0 = cc; k0 = k; } } };
   for (let r = 0; r < rows; r++) { const y = Tm + r * ch, R = (c0, n) => `<rect x="${Lm + c0 * cw}" y="${y}" width="${n * cw}" height="${ch}"/>`;
     run(r, (r1, cc) => { const h = pn.hue ? pn.hue(r1, cc) : null; return h === null || h === undefined ? 'n' : 'h' + h; }, (c0, n, k) => { base += `<rect x="${Lm + c0 * cw}" y="${y}" width="${n * cw}" height="${ch}" fill="${k === 'n' ? '#eef1f6' : HUES[+k.slice(1)]}"/>`; });
     if (pn.inst) run(r, (r1, cc) => pn.inst(r1, cc) ? 'i' : '', (c0, n) => { inst += R(c0, n); });
     if (pn.alt) run(r, (r1, cc) => pn.alt(r1, cc) ? 'a' : '', (c0, n) => { alt += R(c0, n); });
     run(r, (r1, cc) => SCLS[pn.status(r1, cc)] || '', (c0, n, k) => { hat += `<rect class="st-${k}" x="${Lm + c0 * cw}" y="${y}" width="${n * cw}" height="${ch}"/>`; });
-    if (pn.aux) run(r, (r1, cc) => pn.aux(r1, cc) ? 'a' : '', (c0, n) => { aux += R(c0, n); });
+    if (pn.aux) run(r, (r1, cc) => pn.aux(r1, cc) ? 'a' : '', (c0, n) => { if (pn.auxOutline) auxo += `<rect x="${Lm + c0 * cw}" y="${y}" width="${n * cw}" height="${ch}" data-r="${r}" data-c="${c0}" data-n="${n}"/>`; else aux += R(c0, n); });
     if (pn.ctx) run(r, (r1, cc) => pn.ctx(r1, cc) ? 'c' : '', (c0, n) => { ctx += R(c0, n); });
     if (pn.own) run(r, (r1, cc) => pn.own(r1, cc) ? 'o' : '', (c0, n) => { own += R(c0, n); });
+    /* optional per-value fill (swap st Lane 视图): key 'v'+j, one rect per run with value index / colour / logical target metadata */
+    if (pn.vcol) run(r, (r1, cc) => { const j = pn.vcol(r1, cc); return j === null || j === undefined ? '' : 'v' + j; }, (c0, n, k) => { const j = +k.slice(1);
+      vcol += `<rect x="${Lm + c0 * cw}" y="${y}" width="${n * cw}" height="${ch}" fill="${VCOL[j]}" data-vj="${j}" data-vcolor="${VCOL[j]}" data-r="${r}" data-c="${c0}" data-n="${n}"${pn.vdst ? ` data-dst="${pn.vdst(r, c0)}"` : ''}/>`; });
     const rl = pn.rlab && pn.rlab(r); if (rl !== null && rl !== undefined) lab += `<text x="${Lm - 3}" y="${y + Math.min(ch, 10) - 1}" text-anchor="end">${esc(rl)}</text>`;
-    if (pn.text) for (let cc = 0; cc < cols; cc++) txt += `<text x="${Lm + cc * cw + cw / 2}" y="${y + ch - 4}" text-anchor="middle">${esc(pn.text(r, cc))}</text>`;
+    if (pn.text) for (let cc = 0; cc < cols; cc++) { const vj = pn.vcol ? pn.vcol(r, cc) : null;   // value-coloured cell: matching ink (inline style beats .L-txt rule)
+      txt += `<text x="${Lm + cc * cw + cw / 2}" y="${y + ch - 4}" text-anchor="middle"${vj === null || vj === undefined ? '' : ` style="fill:${VINK[vj]}"`}>${esc(pn.text(r, cc))}</text>`; }
   }
   for (let cc = 0; cc < cols; cc++) { const t = pn.clab && pn.clab(cc); if (t !== null && t !== undefined) lab += `<text x="${Lm + cc * cw + 1}" y="${Tm - 5}">${esc(t)}</text>`; }
   let bands = '';
   for (const b of pn.bands || []) bands += `<rect class="band${b.dash ? ' dash' : ''}" x="${Lm + b.c0 * cw}" y="${Tm + b.r0 * ch}" width="${(b.c1 - b.c0 + 1) * cw}" height="${(b.r1 - b.r0 + 1) * ch}"/><text class="bandl" x="${Lm + b.c0 * cw + 3}" y="${Tm + b.r0 * ch + 10}">${esc(b.label)}</text>`;
-  const selR = sel ? `<rect class="selc" x="${Lm + sel[1] * cw - 1}" y="${Tm + sel[0] * ch - 1}" width="${cw + 2}" height="${ch + 2}"/>` : '';
+  /* linked selection (meta = { lane, j }): a red box 2.5px OUTSIDE the cell, so a green address outline on the cell edge stays visible */
+  const selR = !sel ? '' : meta ? `<rect class="selc selk" data-iv-sel="link" data-r="${sel[0]}" data-c="${sel[1]}" data-lane="${meta.lane}" data-j="${meta.j}" x="${Lm + sel[1] * cw - 2.5}" y="${Tm + sel[0] * ch - 2.5}" width="${cw + 5}" height="${ch + 5}"/>`
+    : `<rect class="selc" x="${Lm + sel[1] * cw - 1}" y="${Tm + sel[0] * ch - 1}" width="${cw + 2}" height="${ch + 2}"/>`;
+  /* vcol panels: status hatching moves above the opaque value fills (single copy, so no doubled opacity elsewhere) */
   return `<svg class="dgiv-grid" data-iv-grid="${pn.id}" data-l="${Lm}" data-t="${Tm}" data-cw="${cw}" data-ch="${ch}" data-rows="${rows}" data-cols="${cols}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(pn.title)}">`
-    + `<g>${base}</g><g class="L-inst">${inst}</g><g class="L-alt">${alt}</g><g>${hat}</g><g class="L-aux">${aux}</g><g class="L-ctx">${ctx}</g><g class="L-own">${own}</g><g class="L-txt">${txt}</g><g class="L-lab">${lab}</g>${bands}${selR}</svg>`;
+    + `<g>${base}</g><g class="L-inst">${inst}</g><g class="L-alt">${alt}</g>${pn.vcol ? '' : `<g>${hat}</g>`}<g class="L-aux">${aux}</g><g class="L-ctx">${ctx}</g><g class="L-own">${own}</g>`
+    + `${pn.vcol ? `<g class="L-vcol">${vcol}</g><g class="L-st" data-iv-role="status">${hat}</g>` : ''}${pn.bankLayout ? bankLayer(pn, Lm, Tm, cw, ch, rows, cols) : ''}<g class="L-txt">${txt}</g><g class="L-lab">${lab}</g>${bands}${selR}`
+    + (pn.auxOutline ? `<g class="L-auxo" data-iv-role="addr">${auxo}</g>` : '') + '</svg>';   // address outline last: above fills and the red selection
+}
+/* boxed register file (pn.box): one small focusable box per (Thread r, values[j]) with sticky headers, inside a bounded
+ * scroll viewport (drag / wheel / keyboard). Cells only show v{j}; full detail is in title / aria-label and the inspector.
+ * pn.vcol(r, j) → value index for a per-value fill (Lane 视图). Roving tabindex: the clicked cell, else the selected lane's values[0]. */
+function regBoxHTML(pn, sel, meta) {
+  const foc = sel || [pn.mode === 'lane' ? pn.lane : 0, 0];
+  let h = `<div class="rb-corner" title="${esc(`${pn.clab(0).replace(/\[\d+\]$/, '[j]')}：${pn.unit}`)}">${esc(pn.clab(0).replace(/\[\d+\]$/, '[j]'))}</div>`;
+  for (let j = 0; j < pn.cols; j++) h += pn.ctxCol   // optional: columns written by another instruction are muted context
+    ? `<div class="rb-colh${pn.ctxCol(j) ? ' is-ctx' : ''}" data-c="${j}" data-active="${pn.ctxCol(j) ? 0 : 1}" title="${esc(`${pn.clab(j)}：${pn.ctxCol(j) ? '另一条指令写入（上下文）' : '本条指令写入'}`)}">[${j}]</div>`
+    : `<div class="rb-colh" data-c="${j}" title="${esc(pn.clab(j))}">[${j}]</div>`;
+  for (let r = 0; r < pn.rows; r++) {
+    const ownRow = pn.mode === 'lane' && r === pn.lane;
+    h += `<div class="rb-rowh${ownRow ? ' is-own' : ''}" data-r="${r}"${ownRow ? ' title="所选 lane"' : ''}>${esc(pn.rlab(r))}</div>`;
+    for (let j = 0; j < pn.cols; j++) {
+      const st = SCLS[pn.status(r, j)] || '', own = !!pn.own(r, j), isSel = !!sel && sel[0] === r && sel[1] === j, d = pn.data(r, j), tx = pn.text(r, j);
+      const vj = pn.vcol ? pn.vcol(r, j) : null, hasV = vj !== null && vj !== undefined, cx = !!pn.ctxCol && pn.ctxCol(j);
+      const cls = 'rb-cell' + (own ? ' is-own' : pn.inst(r, j) ? ' is-inst' : '') + (hasV ? ' is-v' : '') + (cx ? ' is-ctx' : '') + (st ? ' st-' + st : '') + (isSel ? ' is-sel' : '');
+      const attrs = Object.keys(d).map(k => ` data-${k}="${esc(d[k])}"`).join('') + (hasV ? ` data-vj="${vj}" data-vcolor="${VCOL[vj]}" style="background-color:${VCOL[vj]};color:${VINK[vj]}"` : '');
+      const label = `${pn.rlab(r)} ${pn.clab(j)}：${pn.unit}，${tx.join('，')}`;
+      h += `<button type="button" class="${cls}" data-iv-cell="${pn.id}" data-r="${r}" data-c="${j}" data-own="${own ? 1 : 0}"${attrs}${isSel && meta ? ` data-iv-sel="link" data-j="${j}"` : ''} tabindex="${foc[0] === r && foc[1] === j ? 0 : -1}"`
+        + ` aria-pressed="${isSel}" aria-label="${esc(label)}" title="${esc(label)}">v${j}</button>`;
+    }
+  }
+  const bar = [['top', `⇡ ${pn.rlab(0)}`], pn.mode === 'lane' ? ['lane', `◎ ${pn.rlab(pn.lane)}`] : null, ['bottom', `⇣ ${pn.rlab(pn.rows - 1)}`], ['left', `⇠ [0]`, pn.clab(0)], ['right', `[${pn.cols - 1}] ⇢`, pn.clab(pn.cols - 1)]].filter(Boolean)
+    .map(([k, t, full]) => `<button type="button" data-iv-scroll="${k}"${full ? ` title="${esc(full)}" aria-label="${esc(full)}"` : ''}>${esc(t)}</button>`).join('');
+  return `<div class="dgiv-boxbar" aria-label="滚动">${bar}</div>`
+    + `<div class="dgiv-regbox" data-iv-box="${pn.id}" data-mode="${pn.mode}" data-lane="${pn.lane}" data-rows="${pn.rows}" data-cols="${pn.cols}" role="group" aria-label="${esc(pn.title)}：拖动 / 滚轮 / 方向键浏览 ${pn.rows}×${pn.cols} 个寄存器">`
+    + `<div class="rb-grid" style="grid-template-columns:auto repeat(${pn.cols},auto)">${h}</div></div>`;
 }
 const CTL = {
   'rg.w': (N) => ({ label: 'warp', opts: range(N.E.warps).map(j => N.E.firstWarp + j), v: N.sel.w }),
@@ -2035,13 +2245,15 @@ const CTL = {
   'loc.step': () => ({ label: '步骤', opts: [0, 1, 2, 3, 4], names: ['ld #0', 'ld #1', 'ld #2', 'ld #3', 'st.v4'] }),
   'loc.half': () => ({ label: '16x256b 第几条', opts: [0, 1], names: ['第 1 条（lane +0..15）', '第 2 条（lane +16..31）'] }),
   'loc.atom': (N) => ({ label: 'TMA atom', opts: range(N.E.tmaPerStore) }),
-  'loc.obs': () => ({ label: '观察一个 D 元素（数据依赖）', check: true })
+  'loc.obs': () => ({ label: '观察一个 D 元素（数据依赖）', check: true }),
+  'loc.mode': () => ({ label: '视图', radio: true, opts: ['lane', 'warp'], names: ['Lane 视图', 'Warp 视图'] })
 };
 function ctlVal(N, key) { const [sc, k] = key.split('.'); return sc === 'rg' ? (k === 'w' ? N.sel.w : k === 'l' ? N.sel.l : N.c[k]) : sc === 'dk' ? N.c[k] : N.loc[k]; }
-function controlsHTML(P, shared) {
+function controlsHTML(P, shared, id) {
   const N = P.N;
   return P.controls.map(key => { const d = CTL[key](N), v = ctlVal(N, key), dis = key.startsWith('loc.') || shared ? '' : ' disabled';
     const scope = key.startsWith('loc.') ? '' : '<span class="dgiv-sh">共享</span>';
+    if (d.radio) return `<span class="dgiv-seg" role="radiogroup" aria-label="${esc(d.label)}" data-iv-seg="${key}">${d.opts.map((o, j) => `<label><input type="radio" name="${esc(id)}-${key}" data-iv-ctl="${key}" value="${o}"${String(o) === String(v) ? ' checked' : ''}> ${esc(d.names[j])}</label>`).join('')}</span>`;
     if (d.check) return `<label><input type="checkbox" data-iv-ctl="${key}"${v ? ' checked' : ''}${dis}> ${esc(d.label)}</label>`;
     if (d.opts) return `<label>${esc(d.label)}${scope} <select data-iv-ctl="${key}"${dis}>${d.opts.map((o, j) => `<option value="${o}"${String(o) === String(v) ? ' selected' : ''}>${esc(d.names ? d.names[j] : o)}</option>`).join('')}</select></label>`;
     return `<label>${esc(d.label)}${scope} <input type="number" data-iv-ctl="${key}" min="${d.min}" max="${d.max}" value="${v}"${dis}> <span class="dgiv-mute">${d.min}..${d.max}</span></label>`; }).join('');
@@ -2049,12 +2261,17 @@ function controlsHTML(P, shared) {
 function legendHTML(P) {
   const used = new Set();
   for (const pn of P.panels) for (let r = 0; r < pn.rows; r++) for (let cc = 0; cc < pn.cols; cc++) used.add(pn.status(r, cc));
-  const items = [['inst', P.simt ? '本条指令（整个 warp）访问范围' : '本条指令访问范围'], P.panels.some(p => p.alt) ? ['alt', '另一条指令的范围（次要上下文）'] : null, P.simt ? ['own', '所选线程在本条指令中的元素'] : null,
+  const items = [['inst', P.simt ? '本条指令（整个 warp）访问范围' : '本条指令访问范围'], P.panels.some(p => p.alt) ? ['alt', '另一条指令的范围（次要上下文）'] : null, P.simt && (!P.vcolors || P.ownLabel) ? ['own', P.ownLabel || '所选线程在本条指令中的元素'] : null,
     P.panels.some(p => p.ctx) ? ['ctx', '所选线程在另一条指令中的元素（次要）'] : null,
-    P.panels.some(p => p.aux) ? ['aux', P.edge === 'st' ? '本 lane 提供地址的行' : P.edge === 'mma' ? '观察元素依赖的 A/B 行段' : '关联位置'] : null,
+    P.vcolors ? (P.addrOutline ? ['auxo', '绿色边框=本lane提供地址的行；填色=values[j]的数据落点'] : null)
+      : P.panels.some(p => p.aux) ? ['aux', P.edge === 'st' ? '本 lane 提供地址的行' : P.edge === 'mma' ? '观察元素依赖的 A/B 行段' : '关联位置'] : null,
     P.edge === 'mma' && P.N.loc.obs ? ['own', '观察的 D 元素'] : null].filter(Boolean);
-  return '<div class="dgiv-legend">' + items.map(([k, t]) => `<span><i class="lg-${k}"></i>${esc(t)}</span>`).join('')
-    + [...used].filter(s => s !== 'ok').map(s => `<span><i class="lg-st st-${s}"></i>${esc(ST[s].split('：')[0].split('（')[0])}</span>`).join('') + '</div>';
+  /* swap st: one swatch per values[j] (same colour in source box and all target views); Lane = selected lane only, Warp = all lanes */
+  const vleg = P.vcolors ? `<span class="dgiv-vleg" data-iv-vlegend="values">${esc(P.vlegLabel)}${VCOL.map((col, j) => `<span data-vj="${j}" data-vcolor="${col}"><i style="background:${col}"></i>[${j}]</span>`).join('')}</span>` : '';
+  return '<div class="dgiv-legend">' + items.map(([k, t]) => `<span><i class="lg-${k}"></i>${esc(t)}</span>`).join('') + vleg
+    + [...used].filter(s => s !== 'ok').map(s => `<span><i class="lg-st st-${s}"></i>${esc(ST[s].split('：')[0].split('（')[0])}</span>`).join('')
+    + (P.legendNote ? `<span class="dgiv-mute" data-iv-note="dtype">${esc(P.legendNote)}</span>` : '')
+    + (P.linkNote ? `<span class="dgiv-linknote" data-iv-note="link"><i class="lg-selk"></i>${esc(P.linkNote)}</span>` : '') + '</div>';
 }
 function infoHTML(P, el) {
   if (!el) return `<div class="dgiv-info dgiv-mute">点击任一图中的格子：显示逻辑坐标、地址（GMEM 偏移 / SMEM 字节+bank / TMEM lane+列）、类型与源码/PTX。</div>`;
@@ -2084,22 +2301,27 @@ function render(edge, opts) {
   /* flow = source → operation → target. Items are nodes (a panel, or a group of panels that are parallel inputs /
    * alternate views of the SAME buffer, drawn without arrows between them) and operation boxes. Arrows only connect
    * consecutive top-level items; the row never wraps (it switches to a top-down column when narrow). */
-  const panelHTML = f => `<figure class="dgiv-panel" data-iv-panel="${f.id}"><figcaption><b>${esc(f.title)}</b><br><span class="dgiv-mute">${esc(f.sub || '')}</span></figcaption><div class="dgiv-scroll">${gridSVG(f, el && el.p === f.id ? [el.r, el.c] : null)}</div></figure>`;
+  /* selection per panel: the linked element's own coordinates in every panel (swap st), else the clicked cell in its panel */
+  const LS = P.linkSel, selOf = f => LS ? LS[f.id] || null : el && el.p === f.id ? [el.r, el.c] : null, meta = LS ? LS.meta : undefined;
+  const panelHTML = f => `<figure class="dgiv-panel${f.box ? ' dgiv-boxp' : ''}" data-iv-panel="${f.id}"${f.mode ? ` data-iv-mode="${f.mode}"` : ''}><figcaption><b>${esc(f.title)}</b><br><span class="dgiv-mute">${esc(f.sub || '')}</span></figcaption>`
+    + (f.box ? regBoxHTML(f, selOf(f), meta) : `<div class="dgiv-scroll">${gridSVG(f, selOf(f), meta)}</div>`) + '</figure>';
   let flow = '';
   P.flow.forEach((f, j) => { if (j) flow += '<div class="dgiv-arrow" aria-hidden="true"></div>';
     if (f.proc) flow += `<div class="dgiv-proc" data-iv-role="op">${f.proc.map(x => `<div>${esc(x)}</div>`).join('')}</div>`;
     else if (f.group) flow += `<section class="dgiv-node dgiv-group" data-iv-role="${f.group}"><div class="dgiv-gh">${esc(f.title)}</div><div class="dgiv-views">${f.views.map(panelHTML).join('')}</div></section>`;
-    else flow += `<section class="dgiv-node" data-iv-role="${j === 0 ? 'src' : 'dst'}">${panelHTML(f)}</section>`; });
+    else flow += `<section class="dgiv-node${f.box ? ' dgiv-node-box' : ''}" data-iv-role="${j === 0 ? 'src' : 'dst'}">${panelHTML(f)}</section>`; });
   const thread = P.thread ? `<table class="dgiv-thr"><tr>${P.thread.head.map(h => `<th>${esc(h)}</th>`).join('')}</tr>${P.thread.rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</table>` : '';
-  return `<div class="dgiv" data-iv-id="${id}" data-iv-edge="${edge}">${DEFS}
+  if (P.panels.some(p => p.box) && typeof document !== 'undefined') {   // snapshot the live subtree now; restore after the host inserts the HTML
+    if (!PENDING.has(id)) { boxSnap(id); PENDING.add(id); Promise.resolve().then(() => { PENDING.delete(id); boxRestore(id); }); } }
+  return `<div class="dgiv" data-iv-id="${id}" data-iv-edge="${edge}"${P.mode ? ` data-iv-mode="${P.mode}"` : ''}${P.linkKey ? ` data-iv-link="${esc(P.linkKey)}"` : ''}>${DEFS}
 <div class="dgiv-head"><b>${esc(P.title)}</b><div class="dgiv-chips">${chips.map(([k, v, p]) => `<span${p && DEPS_OK(p) ? (opts.chipAttrs ? ' ' + opts.chipAttrs(p, id) : ` data-param="${p}" data-pk="field"`) : ''}><i>${esc(k)}</i>${esc(v)}</span>`).join('')}</div></div>
 <div class="dgiv-issuer ${P.simt ? 'simt' : 'single'}"><b>${P.simt ? 'SIMT（逐线程）' : '单线程发射 / 硬件执行'}</b> ${esc(P.issuer)}</div>
-<div class="dgiv-ctl">${controlsHTML(P, !!opts.onChange)}</div>
+<div class="dgiv-ctl">${controlsHTML(P, !!opts.onChange, id)}</div>
 <pre class="dgiv-ptx">${esc(P.ptx.join('\n'))}</pre>
 ${legendHTML(P)}
 <div class="dgiv-flow${P.vertical ? ' vert' : ''}">${flow}</div>
 ${infoHTML(P, el)}
-${thread ? '<details class="dgiv-tbl" open><summary>所选线程的精确映射</summary>' + thread + '</details>' : ''}
+${thread ? `<details class="dgiv-tbl" open><summary>${esc(P.threadTitle || '所选线程的精确映射')}</summary>` + thread + '</details>' : ''}
 <div class="dgiv-facts">${P.facts.map(([k, v]) => `<span><b>${esc(k)}</b> ${esc(v)}</span>`).join('')}</div>
 </div>`;
 }
@@ -2116,27 +2338,137 @@ function onGridClick(ev, svg, id) {
   const cc = Math.floor((p.x - d.l) / d.cw), r = Math.floor((p.y - d.t) / d.ch);
   if (r < 0 || cc < 0 || r >= +d.rows || cc >= +d.cols) return;
   const patch = { el: { p: d.ivGrid, r, c: cc } };
+  if ((v.edge === 'st' || v.edge === 'ld') && linkClick(id, v, d.ivGrid, r, cc)) return;
+  if (v.edge === 'ld') { const k = plan('ld', v.opts).elKey; if (k) patch.el.k = k; }   // (non-swap ld has no link / elKey: unchanged)
   if (v.edge === 'mma' && d.ivGrid === 'd' && (LOCAL.mma || {}).obs) patch.obsRC = [r, cc];
   setLocal(v.edge, patch); rerender(id);
+}
+/* swap st (4 panels) / swap ld (3 panels) linked selection: map the clicked cell to its canonical owner (warp, [s,] i, lane, values[j]).
+ * Owner outside the current warp/s/i (full cdl / cdp / tmem) → navigate shared rg.w / rg.s / rg.i; Lane 视图 also follows the
+ * owner lane; Warp 视图 stays Warp. The link is stored with the OWNER's context key first, so the shared refresh it triggers
+ * keeps it (a manual change does not). ld also tags the clicked cell with that key (its plan drops untagged / stale cells). */
+function linkClick(id, v, p, r, cc) {
+  const P = plan(v.edge, v.opts); if (!P.link) return false;
+  const o = P.link.fromPanel(p, r, cc), N = P.N, tag = k => v.edge === 'ld' ? { k } : {};
+  if (!o) { setLocal(v.edge, { el: Object.assign({ p, r, c: cc }, tag(P.elKey)), link: null }); rerender(id); return true; }   // not epilogue-owned: inspect only
+  const key = P.link.ctxKey(o.w, o.i, o.s);
+  setLocal(v.edge, { el: Object.assign({ p, r, c: cc }, tag(key)), link: { key, lane: o.lane, j: o.j } });
+  delete LINKREV[id];   // explicit click: always locate the element again in all views, even if the link is unchanged
+  const rg = {};
+  if (o.w !== N.sel.w) rg.w = o.w; if (o.s !== undefined && o.s !== N.c.s) rg.s = o.s; if (o.i !== N.c.i) rg.i = o.i; if (N.loc.mode === 'lane' && o.lane !== N.sel.l) rg.l = o.lane;
+  if (Object.keys(rg).length && v.opts.onChange) shared(id, { rg }); else rerender(id);
+  return true;
+}
+/* boxed register viewport state survives re-renders (host refresh replaces the subtree): scroll offsets, last revealed lane, focused cell */
+const BOX = {}, PENDING = new Set();   // PENDING: views whose restore is queued — a second render before it must not snapshot the fresh (unscrolled) subtree
+let FOCUS = null, drag = null, eatClick = false;
+const boxKey = vp => { const r = vp.closest('.dgiv'); return r ? r.dataset.ivId + '|' + vp.dataset.ivBox : null; };
+const boxCell = (vp, r, c) => vp.querySelector(`[data-iv-cell][data-r="${r}"][data-c="${c}"]`);
+/* scroll vp minimally so el is visible below/right of the sticky headers */
+function reveal(vp, el, axes) {
+  if (!el) return; const v = vp.getBoundingClientRect(), b = el.getBoundingClientRect(), hh = (vp.querySelector('.rb-colh') || el).offsetHeight, lw = (vp.querySelector('.rb-rowh') || el).offsetWidth;
+  if (axes !== 'x') { if (b.top < v.top + hh) vp.scrollTop -= v.top + hh - b.top + 4; else if (b.bottom > v.top + vp.clientHeight) vp.scrollTop += b.bottom - v.top - vp.clientHeight + 4; }
+  if (axes !== 'y') { if (b.left < v.left + lw) vp.scrollLeft -= v.left + lw - b.left + 4; else if (b.right > v.left + vp.clientWidth) vp.scrollLeft += b.right - v.left - vp.clientWidth + 4; }
+}
+/* synchronous scroll snapshot of the still-mounted viewports: scroll events are async, so a reveal / keyboard / drag
+ * immediately followed by a click or toggle could otherwise re-render before BOX saw the new offsets */
+function boxSnap(id) {
+  for (const vp of document.querySelectorAll(`.dgiv[data-iv-id="${id}"] [data-iv-box]`)) { const k = boxKey(vp); if (k) BOX[k] = Object.assign(BOX[k] || {}, { x: vp.scrollLeft, y: vp.scrollTop }); }
+  /* target panels' own scroll containers (SVG grids) too, so a linked click / navigation does not reset them */
+  for (const sc of document.querySelectorAll(`.dgiv[data-iv-id="${id}"] [data-iv-panel] > .dgiv-scroll`)) BOX[id + '|scroll:' + sc.parentNode.dataset.ivPanel] = { x: sc.scrollLeft, y: sc.scrollTop };
+}
+/* minimal scroll of a plain (non-sticky) container so el is inside it; never scrolls the page */
+function revealPlain(sc, el) {
+  const v = sc.getBoundingClientRect(), b = el.getBoundingClientRect(), m = 6;
+  if (b.top < v.top) sc.scrollTop -= v.top - b.top + m; else if (b.bottom > v.top + sc.clientHeight) sc.scrollTop += b.bottom - v.top - sc.clientHeight + m;
+  if (b.left < v.left) sc.scrollLeft -= v.left - b.left + m; else if (b.right > v.left + sc.clientWidth) sc.scrollLeft += b.right - v.left - sc.clientWidth + m;
+}
+const LINKREV = {};   // view id → link key last revealed: reveal only when the linked element changes, not on every re-render
+function boxRestore(id) {
+  if (typeof document === 'undefined') return;
+  for (const sc of document.querySelectorAll(`.dgiv[data-iv-id="${id}"] [data-iv-panel] > .dgiv-scroll`)) { const s = BOX[id + '|scroll:' + sc.parentNode.dataset.ivPanel]; if (s) { sc.scrollLeft = s.x; sc.scrollTop = s.y; } }
+  for (const vp of document.querySelectorAll(`.dgiv[data-iv-id="${id}"] [data-iv-box]`)) {
+    const k = boxKey(vp), s = BOX[k], lane = +vp.dataset.lane;
+    if (s) { vp.scrollLeft = s.x; vp.scrollTop = s.y; }
+    if (vp.dataset.mode === 'lane' && (!s || s.lane !== lane)) reveal(vp, boxCell(vp, lane, 0), 'y');   // lane changed elsewhere: bring its row in, never snap to Thread 0
+    BOX[k] = { x: vp.scrollLeft, y: vp.scrollTop, lane };
+    if (FOCUS && FOCUS.k === k && (!document.activeElement || document.activeElement === document.body)) { const b = boxCell(vp, FOCUS.r, FOCUS.c); if (b) b.focus({ preventScroll: true }); }
+  }
+  const root = document.querySelector(`.dgiv[data-iv-id="${id}"]`), lk = root && root.dataset.ivLink;
+  if (!lk) { delete LINKREV[id]; return; }
+  if (LINKREV[id] === lk) return; LINKREV[id] = lk;
+  for (const m of root.querySelectorAll('[data-iv-sel="link"]')) { const vp = m.closest('[data-iv-box]'), sc = m.closest('.dgiv-scroll'); if (vp) reveal(vp, m); else if (sc) revealPlain(sc, m); }
+}
+function onCellClick(b, id) {
+  const v = VIEWS[id]; if (!v) return;
+  FOCUS = { k: boxKey(b.closest('[data-iv-box]')), r: +b.dataset.r, c: +b.dataset.c };
+  if ((v.edge === 'st' || v.edge === 'ld') && linkClick(id, v, b.dataset.ivCell, +b.dataset.r, +b.dataset.c)) return;
+  const el = { p: b.dataset.ivCell, r: +b.dataset.r, c: +b.dataset.c };
+  if (v.edge === 'ld') { const k = plan('ld', v.opts).elKey; if (k) el.k = k; }
+  setLocal(v.edge, { el }); rerender(id);
+}
+function onBoxScroll(btn) {
+  const vp = btn.closest('.dgiv-panel').querySelector('[data-iv-box]'), k = btn.dataset.ivScroll; if (!vp) return;
+  if (k === 'top') vp.scrollTop = 0; else if (k === 'bottom') vp.scrollTop = vp.scrollHeight; else if (k === 'left') vp.scrollLeft = 0; else if (k === 'right') vp.scrollLeft = vp.scrollWidth;
+  else if (k === 'lane') reveal(vp, boxCell(vp, +vp.dataset.lane, 0), 'y');
+}
+const KEYS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], PageUp: [-8, 0], PageDown: [8, 0] };
+function onCellKey(ev, b) {
+  const vp = b.closest('[data-iv-box]'), R = +vp.dataset.rows, C = +vp.dataset.cols, r0 = +b.dataset.r, c0 = +b.dataset.c, d = KEYS[ev.key];
+  let r = r0, c = c0;
+  if (d) { r = Math.max(0, Math.min(R - 1, r0 + d[0])); c = Math.max(0, Math.min(C - 1, c0 + d[1])); }
+  else if (ev.key === 'Home') { c = 0; if (ev.ctrlKey) r = 0; } else if (ev.key === 'End') { c = C - 1; if (ev.ctrlKey) r = R - 1; } else return;
+  ev.preventDefault(); const n = boxCell(vp, r, c); if (!n || n === b) return;
+  b.tabIndex = -1; n.tabIndex = 0; n.focus({ preventScroll: true }); reveal(vp, n);
 }
 let installed = false;
 function install() {
   if (installed || typeof document === 'undefined') return; installed = true;
+  /* drag-to-pan the boxed viewport; pointer capture only after a 5px threshold so a plain click still reaches the cell */
+  document.addEventListener('pointerdown', ev => {
+    const vp = ev.target.closest && ev.target.closest('[data-iv-box]');
+    if (!(ev.target.closest && ev.target.closest('[data-iv-cell]'))) FOCUS = null;
+    if (!vp || ev.button !== 0 || ev.pointerType === 'touch') return;
+    drag = { vp, id: ev.pointerId, x: ev.clientX, y: ev.clientY, sl: vp.scrollLeft, st: vp.scrollTop, on: false };
+  });
+  document.addEventListener('pointermove', ev => {
+    if (!drag || ev.pointerId !== drag.id) return; const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+    if (!drag.on) { if (Math.abs(dx) + Math.abs(dy) < 5) return; drag.on = true; drag.vp.classList.add('drag'); try { drag.vp.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ } }
+    drag.vp.scrollLeft = drag.sl - dx; drag.vp.scrollTop = drag.st - dy; ev.preventDefault();
+  });
+  const endDrag = ev => { if (!drag || ev.pointerId !== drag.id) return; if (drag.on) { eatClick = true; drag.vp.classList.remove('drag'); setTimeout(() => { eatClick = false; }, 0); } drag = null; };
+  document.addEventListener('pointerup', endDrag); document.addEventListener('pointercancel', endDrag);
+  document.addEventListener('click', ev => { if (eatClick) { eatClick = false; ev.stopPropagation(); ev.preventDefault(); } }, true);
+  document.addEventListener('scroll', ev => { const vp = ev.target; if (!vp.dataset || !vp.dataset.ivBox) return; const k = boxKey(vp); if (k) BOX[k] = Object.assign(BOX[k] || {}, { x: vp.scrollLeft, y: vp.scrollTop }); }, true);
+  document.addEventListener('focusin', ev => { const b = ev.target.closest && ev.target.closest('[data-iv-cell]'); FOCUS = b ? { k: boxKey(b.closest('[data-iv-box]')), r: +b.dataset.r, c: +b.dataset.c } : null; });
+  document.addEventListener('keydown', ev => { const b = ev.target.closest && ev.target.closest('[data-iv-cell]'); if (b) onCellKey(ev, b); });
   document.addEventListener('click', ev => {
     const root = ev.target.closest && ev.target.closest('.dgiv'); if (!root) return; const id = root.dataset.ivId;
     const svg = ev.target.closest('svg[data-iv-grid]'); if (svg) { onGridClick(ev, svg, id); return; }
-    const b = ev.target.closest('[data-iv-act="thread"]'); if (b) { const v = VIEWS[id]; if (v) shared(id, v.edge === 'tr' ? { rg: { l: +b.dataset.l } } : { rg: { w: +b.dataset.w, l: +b.dataset.l } }); }
+    const cell = ev.target.closest('[data-iv-cell]'); if (cell) { onCellClick(cell, id); return; }
+    const sb = ev.target.closest('[data-iv-scroll]'); if (sb) { onBoxScroll(sb); return; }
+    const b = ev.target.closest('[data-iv-act="thread"]'); if (b) { const v = VIEWS[id]; if (!v) return;
+      /* in Warp 视图 "选择该线程" only makes sense per lane: switch the local view back to Lane 视图 (shared rg.* untouched by the switch itself) */
+      const toLane = (v.edge === 'st' || v.edge === 'ld') && (LOCAL[v.edge] || {}).mode === 'warp'; if (toLane) setLocal(v.edge, { mode: 'lane' });
+      if (v.opts.onChange) shared(id, v.edge === 'tr' ? { rg: { l: +b.dataset.l } } : { rg: { w: +b.dataset.w, l: +b.dataset.l } }); else if (toLane) rerender(id); }
   });
   document.addEventListener('change', ev => {
     const t = ev.target, key = t.dataset && t.dataset.ivCtl; if (!key) return; const root = t.closest('.dgiv'); if (!root) return; const id = root.dataset.ivId, v = VIEWS[id];
-    const val = t.type === 'checkbox' ? t.checked : (key === 'loc.which' ? t.value : +t.value); const [sc, k] = key.split('.');
-    if (sc === 'loc') { const patch = { [k]: val }; if (k === 'which') patch.blk = 0; if (k !== 'obs') patch.el = null; setLocal(v.edge, patch); rerender(id); return; }
+    const val = t.type === 'checkbox' ? t.checked : (key === 'loc.which' || key === 'loc.mode' ? t.value : +t.value); const [sc, k] = key.split('.');
+    if (sc === 'loc') { const patch = { [k]: val }; if (k === 'which') patch.blk = 0; if (k !== 'obs' && k !== 'mode') patch.el = null; setLocal(v.edge, patch);
+      /* → Lane 视图 with a linked element: the lane follows the element's owner, so the selection survives the switch */
+      const lk = k === 'mode' && val === 'lane' && (LOCAL[v.edge] || {}).link;
+      if (k === 'mode' && (LOCAL[v.edge] || {}).link) delete LINKREV[id];   // mode switch keeping the selection: locate it again
+      if (lk && v.opts.onChange && lk.lane !== cl(v.opts.rg && v.opts.rg.l, 0, 31)) { shared(id, { rg: { l: lk.lane } }); return; }
+      rerender(id); return; }
     shared(id, { [sc]: { [k]: val } });
   });
 }
 function mount(container, edge, opts) { install(); container.innerHTML = render(edge, opts); return { update: o => { container.innerHTML = render(edge, Object.assign({}, opts, o)); } }; }
-/* test helper: client coordinates of the centre of cell (r, c) in a panel */
+/* test helper: client coordinates of the centre of cell (r, c) in a panel (SVG grid, or boxed register cell — scrolled into view first) */
 function cellCenter(rootEl, panelId, r, c) {
+  const vp = rootEl.querySelector(`[data-iv-box="${panelId}"]`);
+  if (vp) { const b = boxCell(vp, r, c); if (!b) return null; reveal(vp, b); const q = b.getBoundingClientRect(); return { x: q.left + q.width / 2, y: q.top + q.height / 2 }; }
   const svg = rootEl.querySelector(`svg[data-iv-grid="${panelId}"]`); if (!svg) return null; const d = svg.dataset, b = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, sx = b.width / vb.width, sy = b.height / vb.height;
   return { x: b.left + (+d.l + (c + 0.5) * d.cw) * sx, y: b.top + (+d.t + (r + 0.5) * d.ch) * sy };
 }
@@ -3246,6 +3578,15 @@ globalThis.DG = { getBestConfig: DM.getBestConfig, deriveModel: DM.deriveModel, 
   sched: () => SCH(),
   _internal: { spec, tmemWhat, edgeInfo, pairs, bars, swzOff, swzInv, refresh } };
 S.M = DM.deriveModel(S.m); renderCfg(); S.cur = { kind: 'tile', k: 'A' }; refresh();
+/* fixed deep links only (no generic routing), all M=257 (swap path):
+ * #swap-stmatrix / #swap-stmatrix-warp → stmatrix view (step ⑥) in Lane / Warp 视图;
+ * #swap-ld / #swap-ld-warp → tcgen05.ld 16x256b view (step ⑤), first load (half 0), Lane / Warp 视图 */
+const ENTRY = { '#swap-stmatrix': ['st', 'lane'], '#swap-stmatrix-warp': ['st', 'warp'], '#swap-ld': ['ld', 'lane'], '#swap-ld-warp': ['ld', 'warp'] };
+const HIT = Object.prototype.hasOwnProperty.call(ENTRY, location.hash) ? ENTRY[location.hash] : null;
+if (HIT && setM('257')) { const [edge, mode] = HIT;
+  if (globalThis.DGInstructionView) { if (mode === 'warp') DGInstructionView.local.set(edge, { mode }); if (edge === 'ld') DGInstructionView.local.set('ld', { half: 0 }); }
+  show('edge', edge);
+  requestAnimationFrame(() => { const v = document.querySelector(`.dgiv[data-iv-edge="${edge}"]`); if (v) v.scrollIntoView({ block: 'start' }); }); }
 })();
 
 </script>
