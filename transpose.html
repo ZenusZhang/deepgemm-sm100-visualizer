@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TMEM → 寄存器 → SMEM：通用转置教学（可选输入 M）</title>
+<style>
+:root{
+  --ink:#0f172a; --ink2:#334155; --mute:#64748b; --line:#e2e8f0; --line2:#cbd5e1;
+  --bg:#f7f8fa; --card:#fff; --acc:#2952cc; --accbg:#eef2ff; --addr:#ea580c;
+  --mono:ui-monospace,"SFMono-Regular","JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:calc(var(--hdr,56px) + 8px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif}
+code,.mono{font-family:var(--mono);font-size:12.5px}
+sub{font-size:70%}
+small{font-size:10px;color:var(--mute)}
+a{color:var(--acc)}
+/* ---------- toolbar ---------- */
+.top{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;padding:7px 16px}
+.top h1{font-size:15px;margin:0;font-weight:650;white-space:nowrap}
+.top h1 span{color:var(--mute);font-weight:400;font-size:13px;margin-left:6px}
+.ctl{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ctl label,.ctl .lbl{font-size:12.5px;color:var(--ink2)}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-right:1px solid var(--line2);background:#fff;padding:3px 10px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink2)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.btn{border:1px solid var(--line2);background:#fff;border-radius:6px;padding:3px 9px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink2)}
+.btn:hover,.seg button:hover{border-color:var(--ink2)}
+button:focus-visible,input:focus-visible,summary:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+#value-input{width:64px;font:12.5px var(--mono);padding:3px 5px;border:1px solid var(--line2);border-radius:6px}
+.stepind{font-size:12.5px;color:var(--ink2);min-width:7em}
+.cfgline{flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink2);font-family:var(--mono)}
+.cfgline b{color:var(--ink)}
+#m-status{color:#9a3412;font-family:inherit}
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;padding:12px 16px 40px;max-width:1600px;margin:0 auto}
+main{min-width:0}
+section{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 14px 12px;margin-bottom:12px}
+section.focus,.panel.focus{border-color:var(--acc);box-shadow:0 0 0 2px var(--accbg)}
+h2{font-size:15px;margin:0 0 6px;font-weight:650}
+h2 .tag{font-size:11.5px;font-weight:500;color:var(--mute);margin-left:6px}
+h3{font-size:13.5px;margin:0 0 4px;font-weight:650}
+p{margin:4px 0 6px}
+.note{font-size:12.5px;color:var(--ink2)}
+.key{background:#fffbea;border:1px solid #f1e3a6;border-radius:6px;padding:7px 10px;margin:6px 0;font-size:13px}
+.fx{font-family:var(--mono);font-size:12.5px;background:#f4f6f9;border:1px solid var(--line);border-radius:6px;padding:6px 9px;margin:6px 0;white-space:pre-wrap;line-height:1.6;overflow-x:auto}
+body[data-mode="trans"] [data-m="nontrans"],body[data-mode="nontrans"] [data-m="trans"]{display:none}
+/* ---------- overview ---------- */
+.flow{display:flex;align-items:stretch;gap:4px;flex-wrap:wrap;margin:6px 0 4px}
+.node{border:1px solid var(--line2);border-radius:6px;background:#fff;padding:5px 8px;font-size:12px;cursor:pointer;text-align:left;font-family:inherit;color:var(--ink);min-width:118px;flex:1 1 118px}
+.node b{display:block;font-size:12.5px}
+.node[aria-current="step"]{border-color:var(--acc);background:var(--accbg)}
+.arrow{align-self:center;font-size:11px;color:var(--mute);text-align:center;line-height:1.25;min-width:64px;flex:0 0 auto}
+.arrow code{font-size:10.5px;display:block;color:var(--ink2)}
+.blocks{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:8px 0 2px}
+.bstack{display:flex;flex-direction:column;gap:3px}
+.bstack.h{flex-direction:row;align-items:flex-start;flex-wrap:wrap}
+.bgrp{display:flex;align-items:center;gap:4px}
+.bstack.h .bgrp{flex-direction:column;align-items:center;gap:1px}
+.glab{font-size:10.5px;color:var(--mute);font-family:var(--mono)}
+.vstack{display:grid;width:56px;border:1.5px solid var(--ink2)}
+.hstack{display:grid;height:30px;border:1.5px solid var(--ink2)}
+.vstack div,.hstack div{display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;overflow:hidden;white-space:nowrap}
+.vstack div+div{border-top:1px solid var(--ink2)}
+.hstack div+div{border-left:1px solid var(--ink2)}
+.b0{background:#eef3ff}.b1{background:#fff1e6}.b2{background:#fdeef0}.b3{background:#f8f6dc}
+.blocks .lab{font-size:11.5px;color:var(--mute);text-align:center}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+table.cfgt{border-collapse:collapse;font-size:12px;margin:4px 0}
+table.cfgt th,table.cfgt td{border:1px solid var(--line);padding:1px 7px;text-align:left;white-space:nowrap}
+table.cfgt th{background:#f8fafc;color:var(--ink2);font-weight:600}
+table.cfgt td{font-family:var(--mono)}
+table.cfgt td.cur,table.cfgt th.cur{background:var(--accbg);font-weight:700}
+.cfgwrap{overflow-x:auto}
+/* ---------- steps ---------- */
+.steps{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 6px}
+.steps button{border:1px solid var(--line2);background:#fff;border-radius:14px;padding:2px 10px;font:inherit;font-size:12.5px;cursor:pointer}
+.steps button[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:#fff}
+#step-text{background:#f8fafc;border-left:3px solid var(--acc);padding:6px 10px;font-size:13px;min-height:58px}
+#step-text .now{display:block;margin-top:4px;font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+/* ---------- grids ---------- */
+.grid2x2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
+.grid2x2>.panel{display:flex;flex-direction:column;min-width:0}
+.grid2x2 .scroll{max-height:clamp(300px,46vh,380px);max-width:100%}
+.panel{border:1px solid var(--line);border-radius:6px;padding:6px 8px 8px;min-width:0}
+.panel h3 small{font-weight:400}
+.scroll{overflow:auto;max-height:min(66vh,640px);border:1px solid var(--line);border-radius:4px;background:#fff;position:relative}
+.scroll.wide{max-height:none}
+table.g{border-collapse:collapse;font-family:var(--mono);font-size:12px}
+table.g th,table.g td{border:1px solid var(--line);padding:0;text-align:center;height:21px}
+table.g thead th{position:sticky;background:#f1f5f9;color:var(--ink2);font-weight:600;font-size:11px;z-index:3;box-shadow:inset 0 -1px 0 var(--line2);white-space:nowrap;padding:0 3px}
+table.g thead tr:nth-child(1) th{top:0;height:20px}
+table.g thead tr:nth-child(2) th{top:20px;height:20px}
+table.g thead tr:nth-child(3) th{top:40px;height:16px;font-size:9.5px;font-weight:500}
+table.g th.rh{background:#f8fafc;color:var(--ink2);font-weight:600;font-size:11px;min-width:42px;padding:0 4px;white-space:nowrap}
+table.g th.rh small{margin-left:3px}
+table.g th.stick{position:sticky;left:0;z-index:2;box-shadow:inset -1px 0 0 var(--line2)}
+table.g thead th.stick{z-index:4}
+table.g th.blk{background:#f8fafc;font-size:12px;min-width:34px;padding:0 3px;line-height:1.2}
+table.g th.blk small{display:block}
+table.g tr.wsep th{background:#e8edf5;color:var(--ink);text-align:left;font-size:11px;font-weight:600;padding:0 6px;height:18px;border-top:2px solid var(--ink2)}
+table.g tr.wsep th small{margin-left:6px}
+td.c{width:34px;min-width:34px;cursor:pointer;color:#111827;position:relative}
+td.c:hover,.e:hover{filter:brightness(.93)}
+tr.bt>*{border-top:2px solid var(--ink2)}
+.bl{border-left:2px solid var(--ink2)!important}
+.bls{border-left:1.5px solid #94a3b8!important}
+.atomb{border-left:3px solid var(--acc)!important}
+.half{width:30px;min-width:30px}
+td.half.hi{border-left:1px dashed #94a3b8}
+th.noaddr{font-style:italic}
+th.noaddr:not(.hl):not(.ha){color:var(--mute)!important}
+/* colors keyed only by values[j] */
+.j0{background:#d6e6ff}.j1{background:#cdeedd}.j2{background:#ffe0c6}.j3{background:#e6dcff}
+.j4{background:#ffd7dc}.j5{background:#ccecf2}.j6{background:#fbefa6}.j7{background:#e2e9c4}
+/* BF16 inexact marker (source ID != BF16 value) */
+.rnd::after{content:"";position:absolute;right:0;top:0;width:0;height:0;border-top:6px solid #b91c1c;border-left:6px solid transparent;pointer-events:none}
+[data-value]{outline-offset:-2px}
+[data-selected="true"]{outline:2px solid #0b1220;box-shadow:inset 0 0 0 4px rgba(255,255,255,.85);font-weight:800;z-index:1}
+.hv:not([data-selected="true"]){outline:2px dashed #475569}
+.hl{background:var(--ink)!important;color:#fff!important}
+.hl small{color:#cbd5e1}
+.ha{box-shadow:inset 0 0 0 2px var(--addr)!important}
+th.ha:not(.hl){color:var(--addr)!important;background:#fff4ec!important}
+.hp{box-shadow:inset 0 0 0 2px #64748b}
+/* fragments */
+td.pair{padding:0;white-space:nowrap;min-width:62px}
+.e{display:inline-block;width:30px;height:19px;line-height:19px;cursor:pointer;position:relative}
+.e+.e{border-left:1px dashed #94a3b8}
+/* address table */
+table.addr td{min-width:70px;padding:0 6px;font-size:11.5px;white-space:nowrap}
+table.addr td b{font-weight:600;color:var(--acc)}
+table.addr td.hl b{color:#c7d2fe}
+.lsplit{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;align-items:start}
+.lsplit>*{min-width:0}
+.lsplit #view-addr{max-width:100%}
+/* physical */
+table.phys td.ph{width:22px;min-width:22px;font-size:10px;cursor:pointer;height:20px}
+table.phys td.hb{border-left:1px dotted #cbd5e1}
+table.phys td.lb,table.phys th.lb{border-left:1px solid #94a3b8}
+table.phys .sl{border-left:2px solid var(--ink2)!important}
+table.phys .lrb{border-left:2px solid #f59e0b!important}
+table.phys td.ph.hp{box-shadow:inset 0 -3px 0 var(--ink)}
+.legend-phys{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin:6px 0}
+.sw{display:inline-block;width:14px;height:12px;border:1px solid var(--line2);vertical-align:-2px;margin-right:4px;position:relative}
+details>summary{cursor:pointer;font-weight:650;font-size:14px}
+details[open]>summary{margin-bottom:6px}
+/* ---------- inspector ---------- */
+aside{position:sticky;top:calc(var(--hdr,56px) + 8px);align-self:start;max-height:calc(100vh - var(--hdr,56px) - 18px);overflow:auto}
+.insp{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.insp h2{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.insp h2 .big{font:700 20px var(--mono)}
+.insp dl{display:grid;grid-template-columns:76px 1fr;gap:3px 8px;margin:6px 0;font-size:12.5px}
+.insp dt{color:var(--mute);font-size:12px}
+.insp dd{margin:0;font-family:var(--mono);font-size:12px;word-break:break-word}
+.insp dd .s{font-family:inherit;color:var(--mute);font-size:11px}
+.insp dd.addr{color:var(--addr)}
+.insp hr{border:0;border-top:1px solid var(--line);margin:6px 0}
+.insp .alt{font-size:12px;background:#f8fafc;border-radius:5px;padding:5px 7px;color:var(--ink2)}
+.legend{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:8px}
+.legend span{font:11px var(--mono);padding:2px 4px;border-radius:3px;border:1px solid rgba(0,0,0,.06);white-space:nowrap}
+.legend-t{font-size:11.5px;color:var(--mute);margin-top:8px}
+.warn{color:#9a3412}
+/* ---------- section reorder (only the four large diagrams) ---------- */
+.sort-bar{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:12px;color:var(--ink2);margin:-4px 2px 8px}
+.sort-bar .btn{padding:1px 8px;font-size:12px}
+#sort-live{color:var(--acc)}
+.sortable{position:relative}
+.sortable>section{position:relative}
+.sortable>section>h2,.sortable>section>details>summary{padding-right:30px}
+.drag-handle{position:absolute;top:7px;right:8px;z-index:5;width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:5px;background:#fff;color:var(--mute);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.drag-handle:hover{border-color:var(--ink2);color:var(--ink);background:#f8fafc}
+.grip{display:inline-block;width:8px;height:12px;background:radial-gradient(circle,currentColor 1.1px,transparent 1.6px) 0 0/4px 4px;pointer-events:none}
+.sort-bar .grip{vertical-align:-1px;color:var(--mute)}
+body.sorting,body.sorting *{cursor:grabbing!important;-webkit-user-select:none!important;user-select:none!important}
+section.sort-src{opacity:.45;outline:2px dashed var(--acc);outline-offset:2px}
+.sort-indicator{position:absolute;left:-4px;right:-4px;height:4px;margin-top:-2px;border-radius:2px;background:var(--acc);box-shadow:0 0 0 3px rgba(41,82,204,.18);pointer-events:none;z-index:20}
+.sort-indicator.noop{background:var(--line2);box-shadow:none}
+.sort-ghost{position:fixed;left:0;top:0;z-index:40;pointer-events:none;max-width:340px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:var(--ink);color:#fff;font-size:12px;padding:3px 9px;border-radius:5px;box-shadow:0 4px 14px rgba(15,23,42,.25)}
+/* ---------- responsive ---------- */
+@media (max-width:1180px){
+  .layout{grid-template-columns:minmax(0,1fr) 260px}
+}
+@media (max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  aside{position:static;max-height:none;order:-1}
+  .grid2x2,.two,.lsplit{grid-template-columns:minmax(0,1fr)}
+  .top h1 span{display:none}
+  .top h1{white-space:normal}
+}
+@media (max-width:520px){
+  .layout{padding:10px 8px 32px}
+  section{padding:8px 9px 10px}
+  .top{padding:6px 8px}
+}
+</style>
+</head>
+<body data-mode="trans">
+<header class="top">
+  <h1>TMEM → 寄存器 → SMEM：通用转置教学<span>T[M,8] FP32 → S[8,M] BF16</span></h1>
+  <div class="ctl" role="group" aria-labelledby="m-label">
+    <span class="lbl" id="m-label">输入矩阵 M（T 的行数）</span>
+    <span class="seg" id="m-select"><button type="button" id="m-16" data-action="set-m" data-mval="16" aria-pressed="false" title="T[16,8]：1 warp，1 条 .16x256b，stmatrix.x2，swizzle 32B">16</button><button type="button" id="m-32" data-action="set-m" data-mval="32" aria-pressed="true" title="T[32,8]：1 warp，2 条 .16x256b，stmatrix.x4，swizzle 64B">32</button><button type="button" id="m-64" data-action="set-m" data-mval="64" aria-pressed="false" title="T[64,8]：2 warp，各 2 条 .16x256b，各一条 stmatrix.x4，swizzle 128B">64</button><button type="button" id="m-128" data-action="set-m" data-mval="128" aria-pressed="false" title="T[128,8]：4 warp，各 2 条 .16x256b，各一条 stmatrix.x4，swizzle 128B（2 个 atom）">128</button></span>
+  </div>
+  <div class="ctl" role="group" aria-label="stmatrix 模式">
+    <span class="lbl">stmatrix</span>
+    <span class="seg"><button type="button" id="mode-trans" data-action="mode" data-mode="trans" aria-pressed="true" title="带 .trans：通用转置模式；数值 S = BF16_RN(T)ᵀ，源 ID 位置为 Tᵀ">.trans（转置）</button><button type="button" id="mode-nontrans" data-action="mode" data-mode="nontrans" aria-pressed="false" title="教学对照：load、pack、地址都不变，只去掉 .trans">不 trans（对照）</button></span>
+  </div>
+  <div class="ctl">
+    <label for="value-input">选中源 ID v</label>
+    <input id="value-input" data-action="jump" type="number" min="0" max="255" step="1" value="78" title="输入源 ID 后回车：v = 8r + c">
+    <button type="button" class="btn" data-action="reset" title="回到示例 v=78">78</button>
+  </div>
+  <div class="ctl" role="group" aria-label="步骤">
+    <button type="button" class="btn" id="step-prev" data-action="step-prev" title="上一步">◀</button>
+    <span class="stepind" id="step-ind"></span>
+    <button type="button" class="btn" id="step-next" data-action="step-next" title="下一步">▶</button>
+  </div>
+  <div class="cfgline" id="config-summary" aria-live="polite"></div>
+</header>
+
+<div class="layout">
+<main>
+
+<section id="overview">
+  <h2 id="overview-title">总览</h2>
+  <div id="overview-key"></div>
+  <div class="flow" id="flow"></div>
+  <div class="two">
+    <div>
+      <div class="blocks" id="blocks"></div>
+      <p class="note" id="blocks-note"></p>
+    </div>
+    <div class="fx" id="overview-fx"></div>
+  </div>
+  <div id="config-box"></div>
+  <p class="note" id="overview-size"></p>
+</section>
+
+<section id="steps">
+  <h2>分步讲解 <span class="tag">步骤只改变讲解焦点，选中的源 ID v 不变</span></h2>
+  <div class="steps" id="step-buttons" role="group" aria-label="步骤选择"></div>
+  <div id="step-text" aria-live="polite"></div>
+</section>
+
+<div class="sort-bar" id="sort-bar">
+  <span id="sort-help">可调整下面四张大图的顺序：拖动各卡片右上角的 <i class="grip" aria-hidden="true"></i> 手柄（Esc 取消），或聚焦手柄后按 Alt+↑ / Alt+↓。顺序保存在本浏览器中。</span>
+  <button type="button" class="btn" id="sort-reset" title="把四张大图恢复为默认顺序">恢复默认顺序</button>
+  <span id="sort-live" role="status" aria-live="polite"></span>
+</div>
+
+<div class="sortable" id="sort-region" role="group" aria-label="可排序的四张大图">
+<div class="sort-indicator" id="sort-indicator" hidden aria-hidden="true"></div>
+
+<section id="tmem-registers">
+  <button type="button" class="drag-handle" data-sort-handle aria-describedby="sort-help" title="拖动调整顺序；聚焦后 Alt+↑/↓"><i class="grip" aria-hidden="true"></i></button>
+  <h2>输入与寄存器 <span class="tag">数字 = 源 ID v=8r+c（不是转换后的数值）；点击任一数字：七个视图选中同一个 v；方向键在当前表中移动（可跨 warp 组）</span></h2>
+  <div class="grid2x2">
+    <div class="panel" id="panel-tmem">
+      <h3></h3>
+      <div class="scroll" data-view="tmem" id="view-tmem"></div>
+    </div>
+    <div class="panel" id="panel-fp32">
+      <h3></h3>
+      <div class="scroll" data-view="register-fp32" id="view-fp32"></div>
+    </div>
+    <div class="panel" id="panel-p">
+      <h3></h3>
+      <div class="scroll" data-view="converted-bf16" id="view-p"></div>
+      <p class="note" id="note-p"></p>
+    </div>
+    <div class="panel" id="panel-packed">
+      <h3></h3>
+      <div class="scroll" data-view="register-packed" id="view-packed"></div>
+      <p class="note" id="note-packed"></p>
+    </div>
+  </div>
+  <p class="note" id="lane-legend"></p>
+</section>
+
+<section id="fragments">
+  <button type="button" class="drag-handle" data-sort-handle aria-describedby="sort-help" title="拖动调整顺序；聚焦后 Alt+↑/↓"><i class="grip" aria-hidden="true"></i></button>
+  <details open id="fragments-details">
+    <summary id="frag-summary">f 的另一种看法：“块 × 片段”表 → “线程 × 寄存器对”表</summary>
+    <p class="note" id="frag-note"></p>
+    <div class="scroll wide" data-view="fragments" id="view-frag"></div>
+  </details>
+</section>
+
+<section id="smem-logical">
+  <button type="button" class="drag-handle" data-sort-handle aria-describedby="sort-help" title="拖动调整顺序；聚焦后 Alt+↑/↓"><i class="grip" aria-hidden="true"></i></button>
+  <h2 id="logical-title">h：stmatrix → SMEM 逻辑矩阵</h2>
+  <div class="lsplit">
+    <div>
+      <div class="scroll wide" data-view="smem-logical" id="view-logical"></div>
+      <div id="logical-key"></div>
+    </div>
+    <div>
+      <h3 id="addr-title">地址操作数</h3>
+      <div class="scroll wide" id="view-addr" data-role="address-table"></div>
+      <p class="note" id="addr-note"></p>
+    </div>
+  </div>
+</section>
+
+<section id="smem-physical">
+  <button type="button" class="drag-handle" data-sort-handle aria-describedby="sort-help" title="拖动调整顺序；聚焦后 Alt+↑/↓"><i class="grip" aria-hidden="true"></i></button>
+  <details open id="physical-details">
+    <summary id="phys-summary">SMEM 物理字节：phi 与 XOR swizzle（与逻辑 S 分开看）</summary>
+    <div class="fx" id="phys-fx"></div>
+    <p class="note" id="phys-note"></p>
+    <div class="legend-phys" id="phys-legend"></div>
+    <div class="scroll wide" data-view="smem-physical" id="view-phys"></div>
+  </details>
+</section>
+
+</div>
+
+<section id="sources">
+  <details>
+    <summary>可选参考：出处，以及 DeepGEMM 中的一个具体例子</summary>
+    <ul class="note">
+      <li>本页是<b>通用教学配置</b>：输入 T[M,8]（M ∈ {16,32,64,128}），输出 S[8,M]，swizzle 宽度 B 按“{128,64,32,16} 中能整除 2M 的最大者”这一示意策略选取。它<b>不是</b>任何具体 kernel 的实际执行记录；真实 kernel 会按自己的 TMA box、流水线与 bank 约束另行选择。</li>
+      <li><code>third-party/cutlass/include/cute/atom/copy_traits_sm100.hpp</code>：<code>SM100_TMEM_LOAD_16dp256b1x</code> 的布局（16 个 TMEM lane × 256 bit；线程 4q+u 拿到第 q、q+8 行的第 2u、2u+1 个 32-bit 元素），本页的 dataLane = 4q+u、values[2k+b] 由此而来。</li>
+      <li>PTX <code>stmatrix.sync.aligned.m8n8.x1/x2/x4{.trans}.shared.b16</code>：.xN 写 N 个 8×8 b16 矩阵；lane 8k+row 提供第 k 个矩阵第 row 行的 16B 起点（x2 只用 lane 0–15 的地址）；每线程为每个矩阵提供一个 b32（两个 b16）。所有 32 个线程都执行这条 .sync.aligned 指令。</li>
+      <li>tcgen05 规则：一个 warp 只能访问与其 warp id mod 4 对应的 32-lane TMEM 分区。本页中 M=64/128 的 tile 内 warp w 就是被安排在可访问第 w 个分区的 warp 上；编号 w 只在 tile 内有意义。</li>
+      <li>一个具体例子（仅供对照）：DeepGEMM <code>deep_gemm/include/deep_gemm/epilogue/sm100_store_cd_swap_ab.cuh</code> 在 swap-AB BF16 收尾中，每个 epilogue warp 用两条 <code>SM100_TMEM_LOAD_16dp256b1x::copy</code>（第二条地址 | 0x00100000）读 32 行，再经 <code>math::cast_into_bf16_and_pack</code>（<code>__float22bfloat162_rn</code>，x→低 16 位）打包，以 <code>SM90_U32x4_STSM_T</code>（x4.trans）写入 128B swizzle 的缓冲；它的 swizzle 宽度、warp 编号与缓冲槽位由该 kernel 自己决定，和本页的通用 B 策略不同（例如本页 M=32 选 64B）。</li>
+      <li>本页所有落点由上述公式逐元素枚举，页面加载时的 <code>selfCheck()</code> 只检查地址公式：4 种 M × 2 种模式下，8M 个元素的字节偏移是 0…16M−2 全部偶数偏移的双射（无重叠、无越界），每个段起点 16B 对齐、等于 phi(outRow,outCol) 的分解，且地址 lane / 块号不越界。它<b>不</b>检查 DOM 视图内容。本页不做也不声称任何 GPU 实测或性能结论。</li>
+    </ul>
+  </details>
+</section>
+
+</main>
+
+<aside aria-label="选中元素检查器">
+  <div class="insp" id="inspector" aria-live="polite"></div>
+</aside>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- configuration ----------
+  var M_VALUES = [16, 32, 64, 128];
+  var MODES = ['trans', 'nontrans'];
+  var H = 8; // output height is always 8
+  var DEFAULT_V = 78;
+
+  function configFor(M) {
+    var B = [128, 64, 32, 16].filter(function (x) { return (2 * M) % x === 0; })[0];
+    var rowsPerWarp = Math.min(M, 32), K = rowsPerWarp / 8, A = B / 2;
+    return {
+      M: M, B: B, atomWidth: A, warpCount: Math.max(1, M / 32), rowsPerWarp: rowsPerWarp,
+      loadsPerWarp: K / 2, valuesPerLane: 2 * K, packedPerLane: K, stmatrix: 'x' + K,
+      physicalRows: 16 * M / 128, physicalBytes: 16 * M, atomCount: M / A,
+      // extras
+      blocksPerWarp: K, addressOperandsPerWarp: 8 * K, logicalRowBytes: 2 * M, atomBytes: H * B,
+      swizzlePeriodBytes: H * B, outputHeight: H, fp32Bytes: 32 * M, bf16Bytes: 16 * M,
+      elements: 8 * M, xorMask: B / 16 - 1
+    };
+  }
+  var CFG = configFor(32);
+
+  // ---------- numeric helpers ----------
+  var f32 = new Float32Array(1), u32 = new Uint32Array(f32.buffer);
+  function hex(x, w) { return '0x' + (x >>> 0).toString(16).toUpperCase().padStart(w, '0'); }
+  function fp32Bits(v) { f32[0] = v; return u32[0]; }
+  // FP32 -> BF16, round to nearest, ties to even (finite inputs only; all IDs here are small non-negative integers)
+  function bf16RN(v) { var x = fp32Bits(v); return ((x + 0x7FFF + ((x >>> 16) & 1)) >>> 16) & 0xFFFF; }
+  function bf16ToFloat(h) { u32[0] = (h << 16) >>> 0; return f32[0]; }
+
+  // ---------- pure math ----------
+  function phiFor(C, row, col) {
+    var B = C.B, A = C.atomWidth, box = Math.floor(col / A), lc = col % A, a = row * B + 2 * lc;
+    return box * H * B + (a ^ (((a >> 7) & (B / 16 - 1)) << 4));
+  }
+  function phi(row, col, M) { return phiFor(M ? configFor(M) : CFG, row, col); }
+  function jOf(v) { return 2 * (((v >> 3) & 31) >> 3) + (v & 1); }
+
+  function checkMode(mode) {
+    if (MODES.indexOf(mode) < 0) throw new Error("mode must be 'trans' or 'nontrans'");
+  }
+
+  function traceFor(C, value, mode) {
+    value = Number(value);
+    if (!Number.isInteger(value) || value < 0 || value >= 8 * C.M) return null;
+    var r = value >> 3, c = value & 7, w = r >> 5, nLocal = r & 31, k = nLocal >> 3, q = nLocal & 7, u = c >> 1, b = c & 1;
+    var outRow, outCol;
+    if (mode === 'trans') { outRow = c; outCol = r; }
+    else { outRow = q; outCol = 32 * w + 8 * k + c; }
+    var segCol = 32 * w + 8 * k, segmentByte = phiFor(C, outRow, segCol), off = 2 * (outCol & 7), byte = segmentByte + off;
+    var box = Math.floor(outCol / C.atomWidth), localCol = outCol % C.atomWidth, a = outRow * C.B + 2 * localCol;
+    var xorTerm = ((a >> 7) & (C.B / 16 - 1)) << 4;
+    var fb = fp32Bits(value), hb = bf16RN(value), bv = bf16ToFloat(hb);
+    var lo = value & ~1, hi = value | 1, pb = ((bf16RN(hi) << 16) | bf16RN(lo)) >>> 0;
+    var bankHalf = (byte & 3) >> 1, lane = 4 * q + u;
+    return {
+      value: value, mode: mode, M: C.M, B: C.B,
+      sourceRow: r, sourceCol: c, r: r, c: c,
+      warp: w, w: w, nLocal: nLocal, k: k, q: q, u: u, b: b, block: 'B' + k,
+      load: k >> 1, lane: lane, dataLane: lane, j: 2 * k + b, packed: k, half: b, halfName: b ? 'high' : 'low',
+      tmemLane: r, outRow: outRow, outCol: outCol, addressLane: addressLaneOf(k, outRow), addressRow: outRow, addressWarp: w,
+      segmentCol: segCol, segmentByte: segmentByte, offsetInSegment: off, byte: byte, phi: phiFor(C, outRow, outCol),
+      box: box, atom: box, localCol: localCol, swizzleIn: a, xorTerm: xorTerm,
+      segment: (byte >> 4) & 7, physRow: byte >> 7, bank: (byte >> 2) & 31, bankHalf: bankHalf, bankHalfName: bankHalf ? 'high' : 'low',
+      fp32Value: value, fp32Bits: hex(fb, 8), fp32BitsU32: fb,
+      bf16Bits: hex(hb, 4), bf16BitsU16: hb, bf16Value: bv, bf16Exact: bv === value,
+      packedLowValue: lo, packedHighValue: hi, packedBits: hex(pb, 8), packedBitsU32: pb
+    };
+  }
+  function addressLaneOf(k, outRow) { return 8 * k + outRow; }
+
+  function trace(value, mode) {
+    if (mode === undefined) mode = state.mode;
+    checkMode(mode);
+    return traceFor(CFG, value, mode);
+  }
+  function getAllTraces(mode) {
+    if (mode === undefined) mode = state.mode;
+    checkMode(mode);
+    var a = [];
+    for (var v = 0; v < 8 * CFG.M; v++) a.push(traceFor(CFG, v, mode));
+    return a;
+  }
+
+  // value at each view coordinate (current config)
+  function vReg(w, t, j) { var k = j >> 1, b = j & 1, q = t >> 2, u = t & 3; return 8 * (32 * w + 8 * k + q) + 2 * u + b; }
+  function vOut(row, col, mode) {
+    if (mode === 'trans') return 8 * col + row;
+    var w = col >> 5, k = (col & 31) >> 3, c = col & 7;
+    return 8 * (32 * w + 8 * k + row) + c;
+  }
+
+  var STEPS = [
+    { id: 'input', name: '① 输入 T', target: 'panel-tmem', node: 0 },
+    { id: 'load', name: '② f：tcgen05.ld', target: 'panel-fp32', node: 1 },
+    { id: 'fragments', name: '③ f = 片段表转置', target: 'fragments', node: 1 },
+    { id: 'pack', name: '④ P：cvt+pack → BF16', target: 'panel-packed', also: ['panel-p'], node: 3 },
+    { id: 'stmatrix', name: '⑤ h：stmatrix', target: 'smem-logical', node: 4 },
+    { id: 'physical', name: '⑥ 物理 swizzle', target: 'smem-physical', node: 5 }
+  ];
+
+  var state = { selectedValue: DEFAULT_V, mode: 'trans', step: 0 };
+  var mStatus = '';
+
+  // ---------- rendering helpers ----------
+  var $ = function (id) { return document.getElementById(id); };
+  function lohi(b) { return b ? '高' : '低'; }
+  function rng(a, b) { return a === b ? '' + a : a + '–' + b; }
+  function sub(x) { return '<sub>' + x + '</sub>'; }
+  function bfNote(t) { return t.bf16Exact ? 'BF16 精确 = ' + t.bf16Value : 'BF16 舍入为 ' + t.bf16Value + '（≠ ' + t.value + '）'; }
+  function baseTitle(v) {
+    var t = traceFor(CFG, v, 'trans');
+    return 'v=' + v + ' · T[' + t.r + ',' + t.c + '] · warp ' + t.w + ' nLocal=' + t.nLocal + ' B' + t.k + ' q=' + t.q + ' u=' + t.u + ' b=' + t.b +
+      ' · 数据 lane w' + t.w + '·T' + t.lane + ' values[' + t.j + '] · R[' + t.k + '].' + lohi(t.b) + '16';
+  }
+  function cellAttrs(v, gr, gc, title) {
+    return ' data-value="' + v + '" data-j="' + jOf(v) + '" data-warp="' + ((v >> 3) >> 5) + '" data-gr="' + gr + '" data-gc="' + gc +
+      '" tabindex="-1" title="' + title + '"';
+  }
+  function rndCls(v) { return bf16ToFloat(bf16RN(v)) === v ? '' : ' rnd'; }
+  function laneHead(prefix, w, t, extraCls) {
+    var noaddr = CFG.M === 16 && t >= 16;
+    return '<th class="rh stick' + (noaddr ? ' noaddr' : '') + (extraCls || '') + '" data-hl="' + prefix + w + '-' + t + '" data-ha="' + w + '-' + t + '" title="warp ' + w + ' 的线程 T' + t + '：q=' + (t >> 2) + '，u=' + (t & 3) +
+      (noaddr ? '；stmatrix.x2 不使用其地址操作数，但仍提供数据' : '；作为地址 lane 时提供 L' + t + '=8·' + (t >> 3) + '+' + (t & 7) + ' 的段起点') + '">w' + w + '·T' + t + '<small>' + (t >> 2) + ',' + (t & 3) + '</small></th>';
+  }
+  function warpSep(prefix, w, cols, extra) {
+    var C = CFG, r0 = 32 * w, r1 = r0 + C.rowsPerWarp - 1;
+    return '<tr class="wsep"><th colspan="' + cols + '" data-hl="' + prefix + w + '">warp ' + w + '（tile 内）<small>TMEM 行 r=' + rng(r0, r1) +
+      (C.M === 16 ? '，位于该 warp 32-lane 分区的前 16 lane' : '，即第 ' + w + ' 个 32-lane 分区') + (extra || '') + '</small></th></tr>';
+  }
+  function valuesCount() { return CFG.valuesPerLane; }
+
+  // ---------- views ----------
+  function renderTmem() {
+    var C = CFG;
+    $('panel-tmem').querySelector('h3').innerHTML = 'T：TMEM ' + C.M + '×8 <small>行 r ↓（= 32w+nLocal），列 c →；FP32 32-bit/格；' + C.warpCount + ' 个 warp 组</small>';
+    var h = '<table class="g"><thead><tr><th rowspan="2">块</th><th rowspan="2" title="r，小字为 warp 内行 nLocal">r<small>nL</small></th>';
+    for (var u = 0; u < 4; u++) h += '<th colspan="2"' + (u ? ' class="bls"' : '') + ' title="片段 u：c=2u, 2u+1">u=' + u + '</th>';
+    h += '</tr><tr>';
+    for (var c = 0; c < 8; c++) h += '<th data-hl="tc' + c + '"' + (c && !(c & 1) ? ' class="bls"' : '') + '>c' + c + '</th>';
+    h += '</tr></thead><tbody>';
+    for (var w = 0; w < C.warpCount; w++) {
+      h += warpSep('tw', w, 10);
+      for (var nl = 0; nl < C.rowsPerWarp; nl++) {
+        var r = 32 * w + nl, k = nl >> 3, q = nl & 7;
+        h += '<tr' + (q === 0 && nl ? ' class="bt"' : '') + '>';
+        if (q === 0) h += '<th class="blk" rowspan="8" data-hl="tb' + w + '-' + k + '" title="warp ' + w + ' 的 B' + k + ' = T 的第 ' + rng(r, r + 7) + ' 行（nLocal ' + rng(8 * k, 8 * k + 7) + '）；由该 warp 的 load' + (k >> 1) + ' 读取">B<sub>' + k + '</sub><small>w' + w + '·ld' + (k >> 1) + '</small></th>';
+        h += '<th class="rh" data-hl="tr' + r + '">' + r + '<small>' + nl + '</small></th>';
+        for (c = 0; c < 8; c++) {
+          var v = 8 * r + c;
+          h += '<td class="c j' + jOf(v) + (c && !(c & 1) ? ' bls' : '') + '"' + cellAttrs(v, r, c, 'TMEM FP32 = ' + v + ' · ' + baseTitle(v)) + ' data-r="' + r + '" data-c="' + c + '" data-n-local="' + nl + '">' + v + '</td>';
+        }
+        h += '</tr>';
+      }
+    }
+    $('view-tmem').innerHTML = h + '</tbody></table>';
+  }
+
+  function regHeadLoads(prefix) {
+    var C = CFG, h = '';
+    for (var l = 0; l < C.loadsPerWarp; l++)
+      h += '<th colspan="4"' + (l ? ' class="bl"' : '') + ' data-hl="' + prefix + l + '" title="tcgen05.ld .16x256b：各 warp 分区内 nLocal ' + rng(16 * l, 16 * l + 15) + (l ? '（地址 | 0x00100000，即 lane +16）' : '') + '">load' + l + ' · B' + sub(2 * l) + ',B' + sub(2 * l + 1) + '</th>';
+    return h;
+  }
+
+  function renderFp32() {
+    var C = CFG, J = valuesCount();
+    $('panel-fp32').querySelector('h3').innerHTML = 'values：' + C.warpCount + '×32 线程 × ' + J + ' <small>行=数据 lane（按 warp 分组），列=values[j]；FP32 32-bit/格</small>';
+    var h = '<table class="g"><thead><tr><th class="stick" rowspan="2" title="数据 lane t = 4q+u（warp 内）">线程</th>' + regHeadLoads('rl') + '</tr><tr>';
+    for (var j = 0; j < J; j++) h += '<th data-hl="rj' + j + '"' + (j === 4 ? ' class="bl"' : (j & 1 ? '' : (j ? ' class="bls"' : ''))) + ' title="values[' + j + ']：B' + (j >> 1) + '，b=' + (j & 1) + '，FP32 32-bit">[' + j + ']</th>';
+    h += '</tr></thead><tbody>';
+    for (var w = 0; w < C.warpCount; w++) {
+      h += warpSep('rw', w, J + 1);
+      for (var t = 0; t < 32; t++) {
+        h += '<tr' + ((t & 3) === 0 && t ? ' class="bt"' : '') + '>' + laneHead('rt', w, t);
+        for (j = 0; j < J; j++) {
+          var v = vReg(w, t, j);
+          h += '<td class="c j' + j + (j === 4 ? ' bl' : (j && !(j & 1) ? ' bls' : '')) + '"' + cellAttrs(v, 32 * w + t, j, '寄存器 FP32 = ' + v + ' · ' + baseTitle(v)) + ' data-lane="' + t + '" data-reg="' + j + '">' + v + '</td>';
+        }
+        h += '</tr>';
+      }
+    }
+    $('view-fp32').innerHTML = h + '</tbody></table>';
+  }
+
+  function renderPacked() {
+    var C = CFG, K = C.packedPerLane;
+    $('panel-packed').querySelector('h3').innerHTML = 'R：' + C.warpCount + '×32 线程 × ' + K + ' 个 b32 <small>P 的实际输出；R[k] = 低 16-bit | 高 16-bit 两个 BF16；共 ' + C.bf16Bytes + 'B</small>';
+    $('note-packed').innerHTML = 'R[k] 就是“寄存器对 k”：行=线程 t，列=k，正是片段表 E[k,t] 的转置。格内数字仍是<b>源 ID</b>；右上角红三角表示该位置的 BF16 数值 ≠ 源 ID（舍入），ID 仍唯一可追踪。';
+    var h = '<table class="g"><thead><tr><th class="stick" rowspan="2">线程</th>';
+    for (var k = 0; k < K; k++) h += '<th colspan="2" data-hl="pk' + k + '"' + (k ? ' class="bl"' : '') + ' title="R[' + k + ']：32-bit = BF16(values[' + (2 * k) + ']) 低 16 位 | BF16(values[' + (2 * k + 1) + ']) 高 16 位">R[' + k + '] b32</th>';
+    h += '</tr><tr>';
+    for (k = 0; k < K; k++) h += '<th data-hl="pkh' + k + '-0"' + (k ? ' class="bl"' : '') + ' title="低 16 位 = BF16(values[' + (2 * k) + '])">低16</th><th data-hl="pkh' + k + '-1" title="高 16 位 = BF16(values[' + (2 * k + 1) + '])">高16</th>';
+    h += '</tr></thead><tbody>';
+    for (var w = 0; w < C.warpCount; w++) {
+      h += warpSep('pw', w, 2 * K + 1);
+      for (var t = 0; t < 32; t++) {
+        h += '<tr' + ((t & 3) === 0 && t ? ' class="bt"' : '') + '>' + laneHead('pt', w, t);
+        for (k = 0; k < K; k++) for (var b = 0; b < 2; b++) {
+          var j = 2 * k + b, v = vReg(w, t, j), tt = traceFor(CFG, v, 'trans');
+          h += '<td class="c half ' + (b ? 'hi' : 'lo') + ' j' + j + (k && !b ? ' bl' : '') + rndCls(v) + '" data-hp="pp' + w + '-' + t + '-' + k + '"' +
+            cellAttrs(v, 32 * w + t, j, '打包 R[' + k + '].' + lohi(b) + '16 = BF16 ' + tt.bf16Bits + '（' + bfNote(tt) + '）；R[' + k + '] = ' + tt.packedBits + ' · ' + baseTitle(v)) +
+            ' data-lane="' + t + '" data-packed="' + k + '" data-half="' + b + '">' + v + '</td>';
+        }
+        h += '</tr>';
+      }
+    }
+    $('view-packed').innerHTML = h + '</tbody></table>';
+  }
+
+  // P element view: the same BF16 data as R, one 16-bit element per cell (not a separate register array)
+  function renderP() {
+    var C = CFG, J = valuesCount();
+    $('panel-p').querySelector('h3').innerHTML = 'P：转换后的 BF16 元素 <small>' + C.warpCount + '×32 线程 × ' + J + '；列=源 j；16-bit/格，共 ' + C.bf16Bytes + 'B</small>';
+    $('note-p').innerHTML = '先逐元素看转换：P_elem[t,j] = BF16<sub>RN</sub>(values[t][j])（就近舍入、平局取偶）。再把相邻的 j=2k、2k+1 配对，就得到 R[k] 的低/高 16 位：R_t[k].half[b] = P_elem[t,2k+b]。这只是 P 的元素级教学视图，与 R 是同一份 ' + C.bf16Bytes + 'B 数据。格内数字是<b>源 ID</b>，不是 BF16 数值；' + exactSentence() + '实际 BF16 值与位模式见右侧检查器。';
+    var h = '<table class="g"><thead><tr><th class="stick" rowspan="2">线程</th>';
+    for (var j = 0; j < J; j++) h += '<th data-hl="ej' + j + '"' + (j && !(j & 1) ? ' class="bls"' : '') + ' title="BF16(values[' + j + '])：16-bit 元素，实际位于 R[' + (j >> 1) + '] 的' + lohi(j & 1) + ' 16 位">[' + j + ']</th>';
+    h += '</tr><tr>';
+    for (j = 0; j < J; j++) h += '<th data-hl="eh' + (j >> 1) + '-' + (j & 1) + '"' + (j && !(j & 1) ? ' class="bls"' : '') + ' title="= R[' + (j >> 1) + '].' + lohi(j & 1) + '16">R' + (j >> 1) + lohi(j & 1) + '</th>';
+    h += '</tr></thead><tbody>';
+    for (var w = 0; w < C.warpCount; w++) {
+      h += warpSep('ew', w, J + 1);
+      for (var t = 0; t < 32; t++) {
+        h += '<tr' + ((t & 3) === 0 && t ? ' class="bt"' : '') + '>' + laneHead('et', w, t);
+        for (j = 0; j < J; j++) {
+          var k = j >> 1, b = j & 1, v = vReg(w, t, j), tt = traceFor(CFG, v, 'trans');
+          h += '<td class="c j' + j + (j && !b ? ' bls' : '') + rndCls(v) + '" data-hp="ep' + w + '-' + t + '-' + k + '"' +
+            cellAttrs(v, 32 * w + t, j, 'P 元素 [w' + w + '·T' + t + ',' + j + '] = BF16(values[' + j + ']) = R[' + k + '].' + lohi(b) + '16 = ' + tt.bf16Bits + '（' + bfNote(tt) + '） · ' + baseTitle(v)) +
+            ' data-lane="' + t + '" data-reg="' + j + '" data-packed="' + k + '" data-half="' + b + '">' + v + '</td>';
+        }
+        h += '</tr>';
+      }
+    }
+    $('view-p').innerHTML = h + '</tbody></table>';
+  }
+
+  function renderFrag() {
+    var C = CFG, K = C.packedPerLane, W = C.warpCount;
+    $('frag-summary').textContent = 'f 的另一种看法：每个 warp 的 ' + K + '×32 “块 × 片段”表 → 32×' + K + ' “线程 × 寄存器对”表（共 ' + W + ' 个 warp 组）';
+    $('frag-note').innerHTML = '把相邻两元素 (c=2u, 2u+1) 当作一个片段 E<sub>w</sub>[k,t]，t = 4q+u。按输入排列，每个 warp 内<b>行 = 块 k，列 = 片段 t</b>（' + K + '×32）。load 之后按 <b>行 = 线程 t，列 = 寄存器对 k</b> 排列（32×' + K + '，即 R 表）：(values[t][2k], values[t][2k+1]) = E<sub>w</sub>[k,t]。被交换的是 (k, t)；片段内部、B<sub>k</sub> 内部的 (q, c) 都没有被交换；不同 warp 组之间也不交换任何东西。这只是数学视角，硬件不构造 E 表。';
+    var h = '<table class="g"><thead><tr><th class="stick" title="行 = warp w 的块 k">w·块 k \\ 片段 t</th>';
+    for (var t = 0; t < 32; t++) h += '<th data-hl="ft' + t + '"' + ((t & 3) === 0 && t ? ' class="bls"' : '') + ' title="片段 t=' + t + '：块内行 q=' + (t >> 2) + '，u=' + (t & 3) + '；load 后进入同一 warp 的线程 T' + t + '">t' + t + '<small>' + (t >> 2) + ',' + (t & 3) + '</small></th>';
+    h += '</tr></thead><tbody>';
+    for (var w = 0; w < W; w++) for (var k = 0; k < K; k++) {
+      h += '<tr' + (k === 0 && w ? ' class="bt"' : '') + '><th class="rh stick" data-hl="fk' + w + '-' + k + '" title="warp ' + w + ' 的 B' + k + '（TMEM 行 ' + rng(32 * w + 8 * k, 32 * w + 8 * k + 7) + '）→ 该 warp 各线程的 R[' + k + ']">w' + w + '·B<sub>' + k + '</sub><small>→R[' + k + ']</small></th>';
+      for (t = 0; t < 32; t++) {
+        h += '<td class="pair' + ((t & 3) === 0 && t ? ' bls' : '') + '" data-hp="fp' + w + '-' + k + '-' + t + '" title="E' + w + '[' + k + ',' + t + '] → warp ' + w + ' 线程 T' + t + ' 的寄存器对 ' + k + '">';
+        for (var b = 0; b < 2; b++) {
+          var v = vReg(w, t, 2 * k + b);
+          h += '<span class="e j' + (2 * k + b) + '"' + cellAttrs(v, w * K + k, 2 * t + b, '片段 E' + w + '[' + k + ',' + t + '] 第 ' + b + ' 个 · ' + baseTitle(v)) + '>' + v + '</span>';
+        }
+        h += '</td>';
+      }
+      h += '</tr>';
+    }
+    $('view-frag').innerHTML = h + '</tbody></table>';
+  }
+
+  function colBorder(col) {
+    if (!col) return '';
+    if (col % CFG.atomWidth === 0) return ' atomb';
+    if (col % 8 === 0) return ' bl';
+    return '';
+  }
+
+  function renderLogical() {
+    var C = CFG, tr = state.mode === 'trans', M = C.M, K = C.packedPerLane, A = C.atomWidth;
+    $('logical-title').innerHTML = 'h：stmatrix.sync.aligned.' + C.stmatrix + '.m8n8.shared.b16' + (tr ? '.trans' : '') + ' → SMEM 逻辑矩阵 ' +
+      '<span class="tag">' + (tr ? '转置模式：行 c ↓，列 r →；数值 S[8,' + M + '] = Qᵀ，Q = BF16_RN(T)；源 ID 位置为 Tᵀ' : '对照模式：行 q ↓，列 32w+8k+c →；S′[8,' + M + '] 的源 ID 位置不是 Tᵀ') + '；BF16 16-bit/格；' + C.bf16Bytes + 'B；每 warp 一条</span>';
+    var h = '<table class="g"><thead><tr><th class="stick" rowspan="3">' + (tr ? 'c \\ r' : 'q \\ col') + '</th>';
+    for (var x = 0; x < C.atomCount; x++) h += '<th colspan="' + A + '" data-hl="sa' + x + '"' + (x ? ' class="atomb"' : '') + ' title="swizzle atom box ' + x + '：8 行 × ' + C.B + 'B（' + A + ' 个 BF16 列），字节 ' + rng(x * C.atomBytes, (x + 1) * C.atomBytes - 1) + '">atom box ' + x + ' · 8×' + A + ' · ' + C.atomBytes + 'B</th>';
+    h += '</tr><tr>';
+    for (var w = 0; w < C.warpCount; w++) for (var k = 0; k < K; k++) {
+      var c0 = 32 * w + 8 * k;
+      h += '<th colspan="8" data-hl="sg' + w + '-' + k + '" class="' + colBorder(c0).trim() + '" title="warp ' + w + ' 的第 ' + k + ' 个 8×8 矩阵；地址 lane（warp ' + w + ' 内）L' + rng(8 * k, 8 * k + 7) + '">w' + w + '·B' + k + (tr ? 'ᵀ' : '') + ' · L' + rng(8 * k, 8 * k + 7) + '</th>';
+    }
+    h += '</tr><tr>';
+    for (var col = 0; col < M; col++) h += '<th data-hl="sc' + col + '" class="' + colBorder(col).trim() + '" title="' + (tr ? '列 r=' + col + '（warp ' + (col >> 5) + '，B' + ((col & 31) >> 3) + ' 的 q=' + (col & 7) + '）' : '列 ' + col + ' = 32·' + (col >> 5) + '+8·' + ((col & 31) >> 3) + '+c，c=' + (col & 7)) + '">' + (tr ? col : (col & 7)) + '</th>';
+    h += '</tr></thead><tbody>';
+    for (var row = 0; row < H; row++) {
+      h += '<tr><th class="rh stick" data-hl="sr' + row + '">' + (tr ? 'c=' : 'q=') + row + '</th>';
+      for (col = 0; col < M; col++) {
+        var v = vOut(row, col, state.mode), t = traceFor(C, v, state.mode);
+        h += '<td class="c j' + t.j + colBorder(col) + rndCls(v) + '"' +
+          cellAttrs(v, row, col, (tr ? 'S[' : 'S′[') + row + ',' + col + '] · BF16 ' + t.bf16Bits + '（' + bfNote(t) + '）· 字节 ' + t.byte + ' · 地址 lane w' + t.w + '·L' + t.addressLane + ' · ' + baseTitle(v)) +
+          ' data-out-row="' + row + '" data-out-col="' + col + '" data-byte="' + t.byte + '" data-box="' + t.box + '" data-address-lane="' + t.addressLane + '">' + v + '</td>';
+      }
+      h += '</tr>';
+    }
+    $('view-logical').innerHTML = h + '</tbody></table>';
+
+    var Mx = 'x' + K;
+    $('logical-key').innerHTML = tr
+      ? '<div class="key">stmatrix.' + Mx + ' 把每个 warp 的 R[k] 当作第 k 个 8×8 矩阵（k=0..' + (K - 1) + '）：线程 4q+u 的 R[k] 是该矩阵第 q 行的第 2u、2u+1 列。<b>.trans</b> 让块内 (q, c) → (c, q)；同一 warp 的地址 lane 8k+row 提供第 k 个矩阵第 row 行的起点，把块放到列 32w+8k…32w+8k+7。于是位置关系 <b>S<sub>ID</sub>[c,r] = T<sub>ID</sub>[r,c]</b>（源 ID 位置为 Tᵀ），数值 <b>S[c,r] = BF16_RN(T[r,c])</b>，即 S（8×' + M + '）= Qᵀ，其中 Q（' + M + '×8）= BF16_RN(T)。' + C.warpCount + ' 个 warp 各写自己的 ' + (8 * C.rowsPerWarp) + ' 个元素，互不交叠。</div>'
+      : '<div class="key"><b>对照（教学用）：</b>load、pack、地址全部不变，只去掉 .trans。块内不再交换，B<sub>k</sub> 原样放到列 32w+8k…+7：S′[q, 32w+8k+c] = BF16_RN(T[32w+8k+q, c])（位置：S′<sub>ID</sub>[q, 32w+8k+c] = T<sub>ID</sub>[32w+8k+q, c]）。它仍是 8×' + M + ' 的区域，<b>但源 ID 位置不是 Tᵀ</b>（也不是 ' + M + '×8 的 T）：块从竖排变成横排，块内不转置。这说明“块的位置”来自地址，“块内转置”来自 .trans。</div>';
+  }
+
+  function renderAddr() {
+    var C = CFG, tr = state.mode === 'trans', K = C.packedPerLane;
+    $('addr-title').innerHTML = '地址操作数：每 warp ' + C.addressOperandsPerWarp + ' 个（stmatrix.' + C.stmatrix + '），共 ' + (C.addressOperandsPerWarp * C.warpCount) + ' 个 <small>段起点 = phi(row, 32w+8k)，基址 0</small>';
+    var h = '<table class="g addr"><thead><tr><th class="stick">' + (tr ? 'row=c' : 'row=q') + '</th>';
+    for (var w = 0; w < C.warpCount; w++) for (var k = 0; k < K; k++) h += '<th data-hl="ak' + w + '-' + k + '"' + (k === 0 && w ? ' class="bl"' : '') + '>w' + w + '·k=' + k + (tr ? ' (B' + k + 'ᵀ)' : ' (B' + k + ')') + '</th>';
+    h += '</tr></thead><tbody>';
+    for (var r = 0; r < 8; r++) {
+      h += '<tr><th class="rh stick" data-hl="ar' + r + '">' + r + '</th>';
+      for (w = 0; w < C.warpCount; w++) for (k = 0; k < K; k++) {
+        var L = 8 * k + r, col = 32 * w + 8 * k, S = phiFor(C, r, col);
+        h += '<td data-hl="al' + w + '-' + L + '" data-address-lane="' + L + '" data-warp="' + w + '"' + (k === 0 && w ? ' class="bl"' : '') +
+          ' title="warp ' + w + ' 的地址 lane L' + L + ' 提供第 ' + k + ' 个 8×8 矩阵第 ' + r + ' 行的起点 = phi(' + r + ',' + col + ') = ' + S + '；物理行 ' + (S >> 7) + '，bank ' + ((S >> 2) & 31) + '–' + (((S >> 2) & 31) + 3) + '"><b>w' + w + '·L' + L + '</b> ' + S + '</td>';
+      }
+      h += '</tr>';
+    }
+    $('view-addr').innerHTML = h + '</tbody></table>';
+    $('addr-note').innerHTML = '地址 lane L = 8k + row（<b>同一 warp</b> 内）提供第 k 个 8×8 矩阵第 row 行的 16B 起点' + (tr ? '，row = 输出行 c。' : '，row = 输出行 q。') + '两种模式中这张表完全相同。' +
+      (C.M === 16 ? '<b>.x2：只有 lane 0–15 提供地址</b>；lane 16–31 的地址操作数不被使用，但这 16 个线程仍提供各自的 2 个 b32 数据，全部 32 线程参与。' : '') +
+      '<b>地址 lane 与数据 lane 是两种不同职责</b>：数值来自数据 lane T(4q+u)，段起点来自地址 lane L(8k+row)；两者编号可能恰好相同，但职责不同（检查器与寄存器表中分别以黑底与橙框标出）。';
+  }
+
+  function renderPhys() {
+    var C = CFG, map = {}, tr = state.mode === 'trans', B = C.B, P = C.physicalRows, perRow = 128 / B;
+    getAllTraces(state.mode).forEach(function (t) { map[t.byte] = t; });
+    $('phys-summary').textContent = 'SMEM 物理字节：phi 与 ' + B + 'B XOR swizzle（与逻辑 S 是同一次 store 的两种看法）';
+    $('phys-fx').textContent =
+      'A = B/2 = ' + C.atomWidth + '（atom 内 BF16 列数），H = 8\n' +
+      'box = ⌊col/A⌋，localCol = col mod A，a = row·B + 2·localCol            （B = ' + B + '）\n' +
+      'phi(row,col) = box·H·B + ( a XOR (((a>>7) & ' + (B / 16 - 1) + ')<<4) )          H·B = ' + C.atomBytes + 'B / atom\n' +
+      'byte = phi(outRow, 32w+8k) + 2·(outCol mod 8)    （= phi(outRow,outCol)）\n' +
+      'bank = ⌊byte/4⌋ mod 32      bankHalf = (byte mod 4)/2（0=低，1=高）      物理行 = ⌊byte/128⌋';
+    $('phys-note').innerHTML = '基址取 0，并按 swizzle 周期 8·B = ' + C.atomBytes + 'B 对齐；每个 box 都是完整 atom（8 行 × ' + B + 'B），从相位 0 开始。本配置共 ' + C.atomCount + ' 个 atom，总计 <b>' + C.physicalBytes + 'B = 16·M</b>，恰好铺满，无空洞：这 ' + (8 * M_cur()) + ' 个 BF16 半字与 0…' + (C.physicalBytes - 2) + ' 的全部偶数字节偏移一一对应。' +
+      '<br>下图每一行是<b>真实的 128B 物理行</b> = 32 bank × 4B = 64 个 BF16 半字，所以共 <b>' + P + ' 行</b>（不是逻辑高度 8）。请区分三种“行”：完整 S 的一行 = 2M = <b>' + C.logicalRowBytes + 'B</b>；atom 内（box 内）一行 = B = <b>' + B + 'B</b>；物理行 = <b>128B</b>。' +
+      (C.atomCount > 1
+        ? '本配置完整 S 的一行（' + C.logicalRowBytes + 'B）跨 ' + C.atomCount + ' 个 ' + C.atomWidth + ' 列的 atom：S 第 outRow 行的前 ' + C.atomWidth + ' 列在 box 0 内行 outRow（物理行 outRow），后 ' + C.atomWidth + ' 列在 box 1 内行 outRow（物理行 8+outRow），各占一个 128B 物理行；不是一个 S 行对应一个物理行。'
+        : (B < 128
+          ? '本配置只有 1 个 atom，完整 S 行 = atom 内行 = ' + B + 'B，所以每个 128B 物理行连续容纳 ' + perRow + ' 个 atom 内行（橙色竖线分隔）；不要把 ' + B + 'B 的行和 128B 的物理行混为一谈。'
+          : '本配置只有 1 个 atom 且 B = 128B，完整 S 行 = atom 内行 = 128B，恰好各占一个物理行（这只对 M=64 成立）。')) +
+      ' XOR 只在每个 ' + B + 'B 的 atom 内行内部重排 16B 段的位置，<b>不是又一次数据搬运或转置</b>：逻辑 S 与物理字节是同一次 stmatrix 写入的两种看法。';
+    $('phys-legend').innerHTML =
+      '<span><i class="sw j0"></i>颜色 = values[j]</span>' +
+      '<span><i class="sw" style="border-left:2px solid #f59e0b"></i>' + (B < 128 ? 'atom 内行（' + B + 'B）边界' : '（B=128：atom 内行 = 128B 物理行' + (C.atomCount > 1 ? '；完整 S 行 ' + C.logicalRowBytes + 'B 分在 ' + C.atomCount + ' 个物理行' : '') + '）') + '</span>' +
+      '<span><i class="sw" style="box-shadow:inset 0 -3px 0 #0f172a"></i>选中元素所在 16B 段（stmatrix 一个行地址写入的范围）</span>' +
+      '<span><i class="sw rnd"></i>BF16 数值 ≠ 源 ID（舍入）</span>' +
+      '<span>寄存器半字恒为 b = c mod 2；物理 bank 半字 = 输出列 mod 2：' + (tr ? '.trans 下为 q mod 2' : '不 trans 下为 c mod 2（恰好等于 b）') + '</span>';
+    var h = '<table class="g phys"><thead><tr><th class="stick" rowspan="3">物理行</th>';
+    for (var s = 0; s < 8; s++) h += '<th colspan="8" data-hl="yg' + s + '"' + (s ? ' class="sl"' : '') + ' title="16B 段 ' + s + '：行内字节 ' + (16 * s) + '–' + (16 * s + 15) + '，bank ' + (4 * s) + '–' + (4 * s + 3) + '">段 ' + s + '</th>';
+    h += '</tr><tr>';
+    for (var bk = 0; bk < 32; bk++) h += '<th colspan="2" data-hl="yb' + bk + '"' + (bk && !(bk & 3) ? ' class="sl"' : (bk ? ' class="lb"' : '')) + ' title="bank ' + bk + '：每行字节 ' + (4 * bk) + '–' + (4 * bk + 3) + '">' + bk + '</th>';
+    h += '</tr><tr>';
+    for (bk = 0; bk < 32; bk++) h += '<th data-hl="yh' + bk + '-0"' + (bk && !(bk & 3) ? ' class="sl"' : (bk ? ' class="lb"' : '')) + '>L</th><th data-hl="yh' + bk + '-1">H</th>';
+    h += '</tr></thead><tbody>';
+    for (var p = 0; p < P; p++) {
+      var base = 128 * p, box = Math.floor(base / C.atomBytes), lr0 = (base % C.atomBytes) / B;
+      var lrTxt = 'box 内行 ' + (B < 128 ? rng(lr0, lr0 + perRow - 1) : lr0) + (C.atomCount > 1 ? '（= 完整 S 第 ' + lr0 + ' 行的列 ' + rng(box * C.atomWidth, (box + 1) * C.atomWidth - 1) + '）' : '');
+      h += '<tr' + (p && base % C.atomBytes === 0 ? ' class="bt"' : '') + '><th class="rh stick" data-hl="yr' + p + '" title="物理行 ' + p + '：字节 ' + base + '–' + (base + 127) + '；atom box ' + box + ' 的' + lrTxt + '">p' + p + '<small>' + base + '</small></th>';
+      for (bk = 0; bk < 32; bk++) for (var hf = 0; hf < 2; hf++) {
+        var byte = base + 4 * bk + 2 * hf, inRow = 4 * bk + 2 * hf, t = map[byte];
+        var cls = hf ? 'hb' : (B < 128 && inRow && inRow % B === 0 ? 'lrb' : (bk && !(bk & 3) ? 'sl' : (bk ? 'lb' : '')));
+        var where = '字节 ' + byte + '–' + (byte + 1) + ' · 物理行 ' + p + ' · bank ' + bk + ' ' + lohi(hf) + '半 · box ' + box + ' 内行 ' + (lr0 + Math.floor(inRow / B));
+        h += '<td class="c ph j' + t.j + ' ' + cls + rndCls(t.value) + '" data-hp="ys' + t.segmentByte + '"' +
+          cellAttrs(t.value, p, 2 * bk + hf, where + ' · ' + (tr ? 'S[' : 'S′[') + t.outRow + ',' + t.outCol + '] · 段起点 ' + t.segmentByte + '（地址 lane w' + t.w + '·L' + t.addressLane + '）· ' + baseTitle(t.value)) +
+          ' data-byte="' + byte + '" data-phys-row="' + p + '" data-bank="' + bk + '" data-bank-half="' + hf + '" data-box="' + box + '">' + t.value + '</td>';
+      }
+      h += '</tr>';
+    }
+    $('view-phys').innerHTML = h + '</tbody></table>';
+  }
+  function M_cur() { return CFG.M; }
+
+  function exactCount() {
+    var n = 0;
+    for (var v = 0; v < 8 * CFG.M; v++) if (bf16ToFloat(bf16RN(v)) !== v) n++;
+    return n;
+  }
+  function exactSentence() {
+    var n = exactCount(), max = 8 * CFG.M - 1;
+    return n ? '本配置源 ID 0…' + max + ' 中有 <b class="warn">' + n + ' 个不能被 BF16 精确表示</b>（BF16 只有 8 位有效位，>256 的部分整数会被舍入，例如 257→256，259→260），这些格右上角有红三角；位置追踪不受影响，因为标签是源 ID。'
+      : '本配置源 ID 0…' + max + ' 都 ≤ 256，可被 BF16 精确表示（这是 M ≤ 32 的巧合，不是一般规律）。';
+  }
+
+  // ---------- overview ----------
+  function renderOverview() {
+    var C = CFG, tr = state.mode === 'trans', M = C.M, W = C.warpCount, K = C.packedPerLane, L = C.loadsPerWarp, N = W * K;
+    $('overview-title').textContent = '总览：T[' + M + ',8] → S[8,' + M + ']，一条数据通路上两次作用在不同轴上的交换';
+    $('overview-key').innerHTML = tr
+      ? '<div class="key"><b>结论（.trans，转置模式）：</b>f（每个 warp ' + L + ' 条 <code>tcgen05.ld.16x256b</code>）交换的是“块号 k × 片段号 t”：每个 warp 的 ' + K + '×32 块×片段表 → 32×' + K + ' 线程×寄存器对表；它<b>不</b>交换 B<sub>k</sub> 内的行 q 与列 c。h（<code>stmatrix.' + C.stmatrix + '.trans</code>）在每个 8×8 块内交换 (q, c)，再由该 warp 的 ' + C.addressOperandsPerWarp + ' 个地址把块<b>横向</b>摆放。两次“转置”作用在不同轴上，不会互相抵消，合起来源 ID 位置为 S<sub>ID</sub>[c,r] = T<sub>ID</sub>[r,c]（位置为 Tᵀ），数值为 S[c,r] = BF16_RN(T[r,c])，即 S = Qᵀ，Q = BF16_RN(T)。' + (W > 1 ? W + ' 个 warp 各管自己的 32 行，彼此之间没有数据交换。' : '') + '</div>'
+      : '<div class="key"><b>当前为对照模式（不 trans）：</b>f 与 pack 完全不变：f 仍只交换“块号 k × 片段号 t”，不交换 B<sub>k</sub> 内的 (q, c)。h 去掉 .trans 后<b>不再</b>交换块内 (q, c)，只由同样的地址把块<b>横向</b>摆放，结果是 8×' + M + ' 的 S′，按源 ID 位置为 [' + blockList(false) + ']：<b>位置不是 Tᵀ</b>（数值仍是逐元素 BF16_RN）。可见“块的位置”来自地址，“块内转置”只来自 .trans。</div>';
+
+    $('flow').innerHTML =
+      '<button type="button" class="node" data-action="step" data-step="0"><b>T：TMEM ' + M + '×8</b>FP32 · ' + C.fp32Bytes + 'B<br>' + W + ' 个 warp 组 × ' + K + ' 块竖排</button>' +
+      '<div class="arrow">f<code>tcgen05.ld</code><code>.16x256b ×' + L + '/warp</code>→</div>' +
+      '<button type="button" class="node" data-action="step" data-step="1"><b>values：' + W + '×32 线程 × ' + C.valuesPerLane + '</b>每格 FP32 32-bit<br>' + (L === 1 ? 'load0→[0..3]' : 'load0→[0..3]，load1→[4..7]') + '</button>' +
+      '<div class="arrow">P<code>cvt.rn + pack</code><code>→ bf16x2</code>→</div>' +
+      '<button type="button" class="node" data-action="step" data-step="3"><b>R：' + W + '×32 线程 × ' + K + ' × b32</b>每个 b32 = 低/高 两个 BF16<br>共 ' + C.bf16Bytes + 'B</button>' +
+      '<div class="arrow">h<code>stmatrix .' + C.stmatrix + '</code><code>' + (tr ? '.trans + 地址' : '无 .trans + 地址') + '</code>→</div>' +
+      '<button type="button" class="node" data-action="step" data-step="4"><b>' + (tr ? 'S：逻辑 8×' + M + ' = BF16_RN(T)ᵀ' : 'S′：逻辑 8×' + M + '（位置非 Tᵀ）') + '</b>BF16 · ' + C.bf16Bytes + 'B<br>' + (tr ? '行 c，列 r（源 ID 位置 Tᵀ）' : '行 q，列 32w+8k+c') + '</button>' +
+      '<div class="arrow">phi<code>' + C.B + 'B XOR swizzle</code>→</div>' +
+      '<button type="button" class="node" data-action="step" data-step="5"><b>SMEM 物理字节</b>' + C.physicalRows + ' 行 × 128B<br>' + C.atomCount + ' 个 8×' + C.B + 'B atom，无空洞</button>';
+
+    // block diagram
+    var bw = N <= 4 ? 56 : (N <= 8 ? 38 : 26), bh = N <= 4 ? 22 : (N <= 8 ? 18 : 14);
+    var T = '<div><div class="bstack">';
+    for (var w = 0; w < W; w++) {
+      T += '<div class="bgrp"><span class="glab">w' + w + '</span><div class="vstack" style="grid-template-rows:repeat(' + K + ',' + bh + 'px)">';
+      for (var k = 0; k < K; k++) T += '<div class="b' + k + '">B' + sub(k) + '</div>';
+      T += '</div></div>';
+    }
+    T += '</div><div class="lab">T：' + M + ' 行 r × 8 列 c</div></div>';
+    var S = '<div><div class="bstack h">';
+    for (w = 0; w < W; w++) {
+      S += '<div class="bgrp"><div class="hstack" style="grid-template-columns:repeat(' + K + ',' + bw + 'px)">';
+      for (k = 0; k < K; k++) S += '<div class="b' + k + '">' + (N > 8 ? k : 'B' + sub(k)) + (tr ? 'ᵀ' : '') + '</div>';
+      S += '</div><span class="glab">w' + w + '</span></div>';
+    }
+    S += '</div><div class="lab">' + (tr ? 'S：8 行 c × ' + M + ' 列 r（按源 ID 位置 = Tᵀ）' : 'S′：8 行 q × ' + M + ' 列 32w+8k+c（按源 ID 位置，非 Tᵀ）') + '<br>每 ' + C.atomWidth + ' 列一个 swizzle atom，共 ' + C.atomCount + ' 个</div></div>';
+    $('blocks').innerHTML = T + '<div class="lab" style="font-size:18px;color:var(--ink2)">⟶</div>' + S;
+    $('blocks-note').innerHTML = (tr ? '块内行列交换由 <code>.trans</code> 提供；' : '当前没有 .trans，块内行列不交换；') + '块从“竖排”变为“横排”由 SMEM 行地址决定（两种模式相同）。块名写作 B<sub>k</sub>（warp 内 k=0..' + (K - 1) + '），线程写作 w·T0…T31，二者不要混淆。warp 编号 w 只在本 tile 内有意义。';
+
+    $('overview-fx').innerHTML =
+      'T[r,c] = 源 ID v = 8r + c        r=0..' + (M - 1) + ', c=0..7   （FP32 数值 = v）\n' +
+      'r = 32w + nLocal,  nLocal = 8k + q,  c = 2u + b\n' +
+      '    w∈0..' + (W - 1) + ', k∈0..' + (K - 1) + ', q∈0..7, u∈0..3, b∈{0,1}\n' +
+      '数据 lane（warp w 内）t = 4q+u,  j = 2k+b,  load = ⌊k/2⌋\n' +
+      'values_w[t][j] = T[r,c]                    (f：每 warp ' + L + ' 条 load)\n' +
+      'R_w,t[k].half[b] = BF16_RN(values_w[t][2k+b])   (P：cvt + pack)\n' +
+      (tr ? 'S[c, 32w+8k+q] = R_w,4q+u[k].half[b]  (h, .trans)\n  位置：S_ID[c,r] = T_ID[r,c]（源 ID 位置为 Tᵀ）\n  数值：S[c,r] = BF16_RN(T[r,c])，S = Qᵀ，Q = BF16_RN(T)'
+          : 'S′[q, 32w+8k+c] = R_w,4q+u[k].half[b]  (h, 无 .trans)\n  位置：S′_ID[q,32w+8k+c] = T_ID[32w+8k+q, c]\n  数值：S′[q,32w+8k+c] = BF16_RN(T[32w+8k+q, c])') + '\n' +
+      '地址 lane（同一 warp w）L = 8k + outRow\n段起点 = phi(outRow, 32w+8k),  字节 = 段起点 + 2·(outCol mod 8)';
+
+    var rows = [['输入 T', function (c) { return c.M + '×8 FP32'; }],
+      ['输出 S', function (c) { return '8×' + c.M + ' BF16'; }],
+      ['S 整行字节 2M', function (c) { return c.logicalRowBytes + 'B'; }],
+      ['swizzle B', function (c) { return c.B + 'B'; }],
+      ['atom（8×B/2）', function (c) { return c.atomCount + ' × 8×' + c.atomWidth + '（' + c.atomBytes + 'B）'; }],
+      ['tile 内 warp', function (c) { return c.warpCount + ' × ' + c.rowsPerWarp + ' 行'; }],
+      ['.16x256b / warp', function (c) { return '' + c.loadsPerWarp; }],
+      ['FP32 / 线程', function (c) { return '' + c.valuesPerLane; }],
+      ['b32 / 线程', function (c) { return '' + c.packedPerLane; }],
+      ['stmatrix / warp', function (c) { return '1 × .' + c.stmatrix; }],
+      ['地址操作数', function (c) { return c.addressOperandsPerWarp + '/warp' + (c.M === 16 ? '（lane 0–15）' : ''); }],
+      ['FP32 → BF16', function (c) { return c.fp32Bytes + 'B → ' + c.bf16Bytes + 'B'; }],
+      ['物理 128B 行', function (c) { return '' + c.physicalRows; }]];
+    var tb = '<div class="cfgwrap"><table class="cfgt"><thead><tr><th>参数</th>';
+    M_VALUES.forEach(function (m) { tb += '<th' + (m === M ? ' class="cur"' : '') + '>M=' + m + '</th>'; });
+    tb += '</tr></thead><tbody>';
+    rows.forEach(function (rw) {
+      tb += '<tr><th>' + rw[0] + '</th>';
+      M_VALUES.forEach(function (m) { tb += '<td' + (m === M ? ' class="cur"' : '') + '>' + rw[1](configFor(m)) + '</td>'; });
+      tb += '</tr>';
+    });
+    tb += '</tbody></table></div>';
+    $('config-box').innerHTML = tb + '<p class="note"><b>B 的选取（本页示意策略）：</b>B 取 {128, 64, 32, 16} 中能整除 2M（S 一行的字节数）的最大者：16→32B，32→64B，64→128B，128→128B。改变 M <b>同时</b>改变 ① 输出 S 每行连续字节数 2M，② 完整 swizzle atom 的形状（8 行 × B 字节）与 XOR 用到的位。这只是一个通用的教学策略，<b>不是</b>每个 kernel 都必须遵守的规则。</p>';
+
+    $('overview-size').innerHTML = '数据量：源 ' + M + '×8×4B = <b>' + C.fp32Bytes + 'B FP32</b>；目标 8×' + M + '×2B = <b>' + C.bf16Bytes + 'B BF16</b>。所有视图中的数字都是<b>源 ID</b> v=8r+c，用来追踪位置。记号：T 存 FP32 数值（= ID），Q = BF16_RN(T)，S 存的是 Q 的元素；写作 X<sub>ID</sub> 的等式只表示源 ID 的位置关系，数值等式总带 BF16_RN。' + exactSentence();
+  }
+  function blockList(trans) {
+    var a = [];
+    for (var w = 0; w < CFG.warpCount; w++) for (var k = 0; k < CFG.packedPerLane; k++) a.push((CFG.warpCount > 1 ? 'w' + w + '·' : '') + 'B' + sub(k) + (trans ? 'ᵀ' : ''));
+    return a.join(' | ');
+  }
+
+  function renderConfigSummary() {
+    var C = CFG;
+    $('config-summary').innerHTML = '<span>T[<b>' + C.M + '</b>,8] → S[8,<b>' + C.M + '</b>]</span><span>swizzle <b>' + C.B + 'B</b> · atom 8×' + C.atomWidth + ' ×' + C.atomCount + '</span><span><b>' + C.warpCount + '</b> warp × ' + C.rowsPerWarp + ' 行</span><span>' + C.loadsPerWarp + '×.16x256b/warp · ' + C.valuesPerLane + ' FP32 → ' + C.packedPerLane + ' b32/线程</span><span>stmatrix.<b>' + C.stmatrix + '</b> · ' + C.addressOperandsPerWarp + ' 地址/warp</span><span>' + C.fp32Bytes + 'B FP32 → ' + C.bf16Bytes + 'B BF16 · ' + C.physicalRows + ' 物理行</span>' +
+      '<span id="m-status">' + mStatus + '</span>';
+    M_VALUES.forEach(function (m) { $('m-' + m).setAttribute('aria-pressed', m === C.M); });
+    var inp = $('value-input');
+    inp.max = 8 * C.M - 1;
+    inp.title = '输入 0–' + (8 * C.M - 1) + ' 后回车，选中源 ID v=8r+c';
+    $('lane-legend').innerHTML = '行头：<b style="background:var(--ink);color:#fff;padding:0 3px">黑底</b> = 选中元素的<b>数据 lane</b>（提供数值）；<b style="color:var(--addr);box-shadow:inset 0 0 0 2px var(--addr);padding:0 3px">橙框</b> = 选中元素的<b>地址 lane</b>（stmatrix 中提供该行 16B 段起点），二者都在同一 warp 内，编号相同时同时显示。' +
+      (C.M === 16 ? ' 斜体灰色行头 lane 16–31：.x2 不使用其地址，但提供数据。' : '');
+  }
+
+  // ---------- inspector & steps ----------
+  function renderInspector() {
+    var C = CFG, t = trace(state.selectedValue, state.mode), o = trace(state.selectedValue, state.mode === 'trans' ? 'nontrans' : 'trans');
+    var tr = state.mode === 'trans', S = tr ? 'S' : 'S′';
+    var h = '<h2><span class="big">v = ' + t.value + '</span><span class="tag">M=' + C.M + ' · ' + (tr ? '.trans（转置）' : '不 trans（对照）') + '</span></h2><dl>' +
+      '<dt>源 TMEM</dt><dd>T[' + t.r + ',' + t.c + ']，v = 8·' + t.r + '+' + t.c + '<br><span class="s">FP32 ' + t.value + ' = ' + t.fp32Bits + '，32-bit</span></dd>' +
+      '<dt>warp</dt><dd>w' + t.w + '（tile 内）<span class="s"> · nLocal=' + t.nLocal + ' · TMEM 分区 ' + t.w + '</span></dd>' +
+      '<dt>分块</dt><dd>B<sub>' + t.k + '</sub> · q=' + t.q + ' · u=' + t.u + ' · b=' + t.b + '<br><span class="s">nLocal=8·' + t.k + '+' + t.q + '，c=2·' + t.u + '+' + t.b + '</span></dd>' +
+      '<dt>f：load</dt><dd>w' + t.w + ' 的 load' + t.load + '<span class="s">（nLocal ' + rng(16 * t.load, 16 * t.load + 15) + '，共 ' + C.loadsPerWarp + ' 条/warp）</span></dd>' +
+      '<dt>数据 lane</dt><dd>w' + t.w + '·T' + t.lane + ' <span class="s">= 4q+u = 4·' + t.q + '+' + t.u + '</span></dd>' +
+      '<dt>寄存器</dt><dd>values[' + t.j + '] <span class="s">= 2k+b，FP32 32-bit</span></dd>' +
+      '<dt>BF16</dt><dd>' + t.bf16Bits + ' = <b>' + t.bf16Value + '</b><br><span class="s ' + (t.bf16Exact ? '' : 'warn') + '">' + (t.bf16Exact ? '精确（RN 不改变数值）' : 'RN 舍入：' + t.value + ' → ' + t.bf16Value + '（平局取偶）') + '；格内标签仍是源 ID ' + t.value + '</span></dd>' +
+      '<dt>P → R</dt><dd>R[' + t.packed + '].' + (t.half ? '高' : '低') + '16 <span class="s">(' + t.halfName + ', b=' + t.half + ')</span><br>R[' + t.packed + '] = ' + t.packedBits + '<br><span class="s">高 = BF16(' + t.packedHighValue + ')，低 = BF16(' + t.packedLowValue + ')</span></dd>' +
+      '</dl><hr><dl>' +
+      '<dt>逻辑输出</dt><dd>' + S + '[' + t.outRow + ',' + t.outCol + ']<br><span class="s">' + (tr ? '行 c，列 r：S<sub>ID</sub>[c,r]=T<sub>ID</sub>[r,c]；数值 S[c,r]=BF16_RN(T[r,c])=' + t.bf16Value : '行 q，列 32w+8k+c；数值 = BF16_RN(T[' + t.r + ',' + t.c + '])=' + t.bf16Value) + '</span></dd>' +
+      '<dt>地址 lane</dt><dd class="addr">w' + t.w + '·L' + t.addressLane + ' <span class="s">= 8k+' + (tr ? 'c' : 'q') + ' = 8·' + t.k + '+' + t.outRow + '：提供本行 16B 段起点</span><br><span class="s">数据 lane w' + t.w + '·T' + t.lane + ' 提供数值；两种职责不同' +
+        (t.addressLane === t.lane ? '，本例编号恰好相同' : '，本例编号不同') + '</span></dd>' +
+      '<dt>段起点</dt><dd>phi(' + t.outRow + ', ' + t.segmentCol + ') = <b>' + t.segmentByte + '</b></dd>' +
+      '<dt>字节</dt><dd>' + t.segmentByte + ' + 2·' + (t.outCol & 7) + ' = <b>' + t.byte + '</b><span class="s">（段内第 ' + (tr ? 'q' : 'c') + '=' + (t.outCol & 7) + ' 个）</span><br><span class="s">box=' + t.box + '，localCol=' + t.localCol + '，a=' + t.swizzleIn + '，XOR ' + t.xorTerm + ' → ' + (t.swizzleIn ^ t.xorTerm) + ' + ' + t.box + '·' + C.atomBytes + '</span></dd>' +
+      '<dt>物理</dt><dd>行 p' + t.physRow + ' · 段 ' + t.segment + ' · bank ' + t.bank + ' · ' + (t.bankHalf ? '高' : '低') + '半<br><span class="s">' + t.byte + ' mod 4 = ' + (t.byte & 3) + '；物理半字 = 输出列 ' + t.outCol + ' mod 2 = ' +
+        (tr ? 'q mod 2 = ' + t.bankHalf + '（寄存器半字 b=c mod 2=' + t.b + (t.bankHalf === t.b ? '，本例恰好相同' : '，本例不同') + '）'
+            : 'c mod 2 = b = ' + t.bankHalf + '（不 trans 时恒等于寄存器半字 b）') + '</span></dd>' +
+      '</dl><div class="alt">另一模式（' + (tr ? '不 trans' : '.trans') + '）：' + (tr ? 'S′[' : 'S[') + o.outRow + ',' + o.outCol + ']，地址 lane w' + o.w + '·L' + o.addressLane + '，段 ' + o.segmentByte + '，字节 ' + o.byte + '，bank ' + o.bank + ' ' + (o.bankHalf ? '高' : '低') + '半</div>' +
+      '<div class="legend-t">颜色只由 values[j] 决定（j = 2k+b）：</div><div class="legend">';
+    for (var j = 0; j < C.valuesPerLane; j++) h += '<span class="j' + j + '" title="values[' + j + ']：B' + (j >> 1) + '，b=' + (j & 1) + '，R[' + (j >> 1) + '].' + lohi(j & 1) + '16">[' + j + '] B' + (j >> 1) + ' ' + lohi(j & 1) + '</span>';
+    $('inspector').innerHTML = h + '</div>';
+  }
+
+  function stepBody(i, t) {
+    var C = CFG, tr = state.mode === 'trans', M = C.M, W = C.warpCount, K = C.packedPerLane, L = C.loadsPerWarp;
+    switch (i) {
+      case 0: return ['T[r,c] 的数字是源 ID v = 8r+c（FP32 数值也等于 v）：' + M + ' 行 r × 8 列 c，FP32，共 ' + C.fp32Bytes + 'B。' +
+          (W > 1 ? '按每 32 行分给 tile 内的 ' + W + ' 个 warp，warp w 只访问自己的第 w 个 32-lane TMEM 分区；' : (M === 16 ? '只有 16 行，由 1 个 warp 在其分区的前 16 lane 中读取；' : '32 行由 1 个 warp 在其 32-lane 分区中读取；')) +
+          'warp 内 nLocal = 8k+q 切成 B<sub>0</sub>…B<sub>' + (K - 1) + '</sub>。',
+        'v=' + t.value + '：T[' + t.r + ',' + t.c + ']，warp ' + t.w + '，B' + t.k + ' 的第 q=' + t.q + ' 行、第 c=' + t.c + ' 列。'];
+      case 1: return ['每个 warp 执行 ' + L + ' 条 tcgen05.ld.sync.aligned.16x256b（每条读本分区 16 行 × 8 FP32）：' +
+          (L === 1 ? 'load0 读 nLocal 0–15（B₀、B₁）→ values[0..3]。' : 'load0 读 nLocal 0–15（B₀、B₁）→ values[0..3]；load1 读 16–31（B₂、B₃）→ values[4..7]。') +
+          '把 c 写成 2u+b：块内第 q 行被线程 4q…4q+3 平分，每线程拿两个相邻元素。B<sub>k</sub> 的行 q 与列 c 没有交换。没有任何一条指令跨越 32-lane 分区。',
+        'v=' + t.value + '：warp ' + t.w + ' 的 load' + t.load + ' → 数据 lane w' + t.w + '·T' + t.lane + '（4·' + t.q + '+' + t.u + '）的 values[' + t.j + ']（2·' + t.k + '+' + t.b + '）。'];
+      case 2: return ['把一对相邻元素当作片段 E<sub>w</sub>[k,t]，t=4q+u。输入里每个 warp 是 ' + K + '×32 的“块 k × 片段 t”表；load 后按“线程 t × 寄存器对 k”是 32×' + K + '，正好是转置。被交换的是 (k,t)，不是块内的 (q,c)，也不跨 warp。',
+        'v=' + t.value + '：片段 E' + t.w + '[' + t.k + ',' + t.lane + '] → w' + t.w + '·T' + t.lane + ' 的寄存器对 ' + t.k + '（R[' + t.k + ']）。'];
+      case 3: return ['P = cvt.rn.bf16x2(values[2k], values[2k+1]) → R[k]：低 16 位 = BF16(values[2k])，高 16 位 = BF16(values[2k+1])，就近舍入、平局取偶。' + C.valuesPerLane + ' 个 FP32 变成 ' + K + ' 个 32-bit 寄存器，数据量 ' + C.fp32Bytes + 'B → ' + C.bf16Bytes + 'B。' + exactSentence(),
+        'v=' + t.value + '：values[' + t.j + '] —P→ R[' + t.k + '].' + lohi(t.b) + '16 = ' + t.bf16Bits + '（' + bfNote(t) + '）；R[' + t.k + '] = ' + t.packedBits + '。'];
+      case 4: return tr ? ['每个 warp 执行一条 stmatrix.' + C.stmatrix + '.trans：把 R[k] 看成第 k 个 8×8 矩阵（线程 4q+u 持有第 q 行的 2u、2u+1 列）。.trans 交换块内 (q,c)；同一 warp 的地址 lane 8k+row 给出第 k 个矩阵第 row 行的起点 phi(row, 32w+8k)，把块放到列 32w+8k…+7。' +
+          (M === 16 ? '.x2 只用 lane 0–15 的 16 个地址，但 32 个线程都提供数据。' : '') + '合起来源 ID 位置 S<sub>ID</sub>[c,r] = T<sub>ID</sub>[r,c]，数值 S[c,r] = BF16_RN(T[r,c])。',
+        'v=' + t.value + '：S[' + t.c + ',' + t.r + ']；地址 lane w' + t.w + '·L' + t.addressLane + ' 提供段起点 ' + t.segmentByte + '，段内 +2·q=' + (2 * t.q) + '。']
+        : ['对照：load、pack、地址都不变，只去掉 .trans。块内不交换，B<sub>k</sub> 原样放到列 32w+8k…+7，得到 8×' + M + ' 的 [' + blockList(false) + ']（按源 ID 位置），位置不是 Tᵀ；每格数值 = BF16_RN(对应源 ID 的 T 元素)。',
+        'v=' + t.value + '：S′[' + t.q + ',' + t.outCol + ']；地址 lane w' + t.w + '·L' + t.addressLane + ' 提供段起点 ' + t.segmentByte + '，段内 +2·c=' + (2 * t.c) + '。'];
+      default: return ['phi 把逻辑 (row, col) 映到字节：每 ' + C.atomWidth + ' 列一个 8×' + C.B + 'B 的完整 atom（共 ' + C.atomCount + ' 个），atom 内用 ' + C.B + 'B XOR swizzle 只重排 16B 段的位置。物理图按真实 128B 行画，共 ' + C.physicalRows + ' 行，' + C.physicalBytes + 'B 全部被写满。这是同一次 store 的另一种看法，不是又一次转置。',
+        'v=' + t.value + '：字节 ' + t.byte + '，物理行 p' + t.physRow + '，段 ' + t.segment + '，bank ' + t.bank + ' ' + lohi(t.bankHalf) + '半 = 输出列 ' + t.outCol + ' 的奇偶（' + (tr ? 'q' : 'c') + ' mod 2）；寄存器半字是 b=c mod 2 → ' + lohi(t.b) + '。'];
+    }
+  }
+
+  function renderSteps() {
+    var t = trace(state.selectedValue, state.mode), s = STEPS[state.step], body = stepBody(state.step, t);
+    var bs = '';
+    STEPS.forEach(function (st, i) { bs += '<button type="button" data-action="step" data-step="' + i + '" aria-pressed="' + (i === state.step) + '">' + st.name + '</button>'; });
+    $('step-buttons').innerHTML = bs;
+    $('step-text').innerHTML = body[0] + ' <a href="#' + s.target + '">查看对应视图 ↓</a><span class="now">' + body[1] + '</span>';
+    $('step-ind').textContent = (state.step + 1) + '/6 ' + s.name.slice(2);
+    document.querySelectorAll('.focus').forEach(function (e) { e.classList.remove('focus'); });
+    $(s.target).classList.add('focus');
+    (s.also || []).forEach(function (id) { $(id).classList.add('focus'); });
+    document.querySelectorAll('#flow .node').forEach(function (e) {
+      if (+e.dataset.step === s.node) e.setAttribute('aria-current', 'step'); else e.removeAttribute('aria-current');
+    });
+    $('step-prev').disabled = state.step === 0;
+    $('step-next').disabled = state.step === STEPS.length - 1;
+  }
+
+  // ---------- selection ----------
+  function revealIn(el) {
+    var box = el.closest('.scroll');
+    if (!box || !el.offsetParent) return;
+    var b = box.getBoundingClientRect(), r = el.getBoundingClientRect();
+    var th = box.querySelector('thead'), headH = th ? th.offsetHeight : 0;
+    var st = el.parentElement && el.closest('tr') && el.closest('tr').querySelector('th.stick'), leftW = st ? st.offsetWidth : 0;
+    if (r.top < b.top + headH) box.scrollTop -= (b.top + headH - r.top) + 6;
+    else if (r.bottom > b.bottom - 2) box.scrollTop += (r.bottom - b.bottom) + 18;
+    if (r.left < b.left + leftW) box.scrollLeft -= (b.left + leftW - r.left) + 6;
+    else if (r.right > b.right - 2) box.scrollLeft += (r.right - b.right) + 18;
+  }
+
+  function hlKeys(t) {
+    var w = t.w;
+    return {
+      hl: ['tw' + w, 'tb' + w + '-' + t.k, 'tr' + t.r, 'tc' + t.c,
+        'rw' + w, 'rt' + w + '-' + t.lane, 'rj' + t.j, 'rl' + t.load,
+        'ew' + w, 'et' + w + '-' + t.lane, 'ej' + t.j, 'eh' + t.k + '-' + t.b,
+        'pw' + w, 'pt' + w + '-' + t.lane, 'pk' + t.k, 'pkh' + t.k + '-' + t.b,
+        'fk' + w + '-' + t.k, 'ft' + t.lane,
+        'sa' + t.box, 'sr' + t.outRow, 'sc' + t.outCol, 'sg' + w + '-' + t.k,
+        'al' + w + '-' + t.addressLane, 'ar' + t.addressRow, 'ak' + w + '-' + t.k,
+        'yr' + t.physRow, 'yb' + t.bank, 'yg' + t.segment, 'yh' + t.bank + '-' + t.bankHalf],
+      hp: ['ep' + w + '-' + t.lane + '-' + t.k, 'pp' + w + '-' + t.lane + '-' + t.k, 'fp' + w + '-' + t.k + '-' + t.lane, 'ys' + t.segmentByte],
+      ha: [w + '-' + t.addressLane]
+    };
+  }
+
+  function applySelection(reveal) {
+    var v = state.selectedValue, t = trace(v, state.mode);
+    document.querySelectorAll('[data-selected]').forEach(function (e) { e.removeAttribute('data-selected'); e.tabIndex = -1; });
+    document.querySelectorAll('.hl').forEach(function (e) { e.classList.remove('hl'); });
+    document.querySelectorAll('.hp').forEach(function (e) { e.classList.remove('hp'); });
+    document.querySelectorAll('.ha').forEach(function (e) { e.classList.remove('ha'); });
+    var sel = document.querySelectorAll('[data-value="' + v + '"]');
+    sel.forEach(function (e) { e.setAttribute('data-selected', 'true'); e.tabIndex = 0; });
+    var keys = hlKeys(t);
+    keys.hl.forEach(function (k) { document.querySelectorAll('[data-hl="' + k + '"]').forEach(function (e) { e.classList.add('hl'); }); });
+    keys.hp.forEach(function (k) { document.querySelectorAll('[data-hp="' + k + '"]').forEach(function (e) { e.classList.add('hp'); }); });
+    keys.ha.forEach(function (k) { document.querySelectorAll('[data-ha="' + k + '"]').forEach(function (e) { e.classList.add('ha'); }); });
+    $('value-input').value = v;
+    renderInspector();
+    renderSteps();
+    if (reveal) sel.forEach(revealIn);
+  }
+
+  function inRange(v) { return Number.isInteger(v) && v >= 0 && v < 8 * CFG.M; }
+
+  function select(value) {
+    var v = Number(value);
+    if (!inRange(v)) return null;
+    state.selectedValue = v;
+    applySelection(true);
+    return trace(v, state.mode);
+  }
+
+  function setStatus(msg) {
+    mStatus = msg;
+    var el = $('m-status');
+    if (el) el.textContent = msg;
+  }
+
+  // free-form input: clamp to the legal range and say so
+  function jumpFromInput(raw) {
+    var v = Math.round(Number(raw)), max = 8 * CFG.M - 1;
+    if (raw === '' || !isFinite(v)) { $('value-input').value = state.selectedValue; return; }
+    if (v < 0 || v > max) {
+      var c = Math.max(0, Math.min(max, v));
+      setStatus('v=' + raw + ' 超出 0–' + max + '，已钳制为 ' + c);
+      v = c;
+    } else setStatus('');
+    select(v);
+  }
+
+  function renderAll() {
+    renderConfigSummary();
+    renderOverview();
+    renderTmem(); renderFp32(); renderP(); renderPacked(); renderFrag();
+    renderLogical(); renderAddr(); renderPhys();
+    syncHeader();
+  }
+
+  function setM(M) {
+    M = Number(M);
+    if (M_VALUES.indexOf(M) < 0) throw new Error('M must be one of 16, 32, 64, 128');
+    var prev = state.selectedValue, max = 8 * M - 1;
+    CFG = configFor(M);
+    if (prev > max) { state.selectedValue = max; setStatus('M=' + M + '：原选中 v=' + prev + ' 超出 0–' + max + '，已钳制为 ' + max); }
+    else setStatus('M=' + M + '：保留选中 v=' + prev);
+    renderAll();
+    applySelection(true);
+    return getState();
+  }
+
+  function setMode(mode) {
+    checkMode(mode);
+    state.mode = mode;
+    document.body.setAttribute('data-mode', mode);
+    $('mode-trans').setAttribute('aria-pressed', mode === 'trans');
+    $('mode-nontrans').setAttribute('aria-pressed', mode === 'nontrans');
+    renderOverview(); renderLogical(); renderAddr(); renderPhys();
+    applySelection(true);
+    return getState();
+  }
+
+  function setStep(i) {
+    i = Math.max(0, Math.min(STEPS.length - 1, Number(i) | 0));
+    state.step = i;
+    renderSteps();
+    return getState();
+  }
+
+  function getConfig() {
+    var C = CFG;
+    return { M: C.M, B: C.B, atomWidth: C.atomWidth, warpCount: C.warpCount, rowsPerWarp: C.rowsPerWarp, loadsPerWarp: C.loadsPerWarp,
+      valuesPerLane: C.valuesPerLane, packedPerLane: C.packedPerLane, stmatrix: C.stmatrix, physicalRows: C.physicalRows,
+      physicalBytes: C.physicalBytes, atomCount: C.atomCount,
+      atomBytes: C.atomBytes, swizzlePeriodBytes: C.swizzlePeriodBytes, outputHeight: H, logicalRowBytes: C.logicalRowBytes,
+      addressOperandsPerWarp: C.addressOperandsPerWarp, addressOperands: C.addressOperandsPerWarp * C.warpCount,
+      totalLoads: C.loadsPerWarp * C.warpCount, totalStmatrix: C.warpCount, fp32Bytes: C.fp32Bytes, bf16Bytes: C.bf16Bytes,
+      elements: C.elements, bf16InexactCount: exactCount() };
+  }
+
+  function getState() {
+    return { M: CFG.M, B: CFG.B, selectedValue: state.selectedValue, mode: state.mode, step: state.step, stepId: STEPS[state.step].id,
+      trace: trace(state.selectedValue, state.mode), config: getConfig() };
+  }
+
+  // self-check: every config/mode is a bijection onto all BF16 halfword offsets and phi decomposes per segment
+  function selfCheck() {
+    var problems = [];
+    M_VALUES.forEach(function (M) {
+      var C = configFor(M);
+      MODES.forEach(function (mode) {
+        var seen = {}, n = 0;
+        for (var v = 0; v < 8 * M; v++) {
+          var t = traceFor(C, v, mode);
+          if (t.byte !== t.phi || t.segmentByte % 16 || t.byte >= C.physicalBytes || seen[t.byte]) problems.push(M + '/' + mode + '/v' + v);
+          seen[t.byte] = 1; n++;
+          if (t.addressLane >= C.addressOperandsPerWarp || t.k >= C.packedPerLane) problems.push(M + '/' + mode + '/lane v' + v);
+        }
+        if (n !== C.physicalBytes / 2) problems.push(M + '/' + mode + ' count');
+      });
+    });
+    if (problems.length && window.console) console.error('transposeDemo self-check failed', problems.slice(0, 10));
+    return problems.length === 0;
+  }
+
+  // ---------- events ----------
+  function onClick(e) {
+    var a = e.target.closest('[data-action]');
+    if (a) {
+      var act = a.getAttribute('data-action');
+      if (act === 'mode') setMode(a.getAttribute('data-mode'));
+      else if (act === 'set-m') setM(+a.getAttribute('data-mval'));
+      else if (act === 'step') setStep(+a.getAttribute('data-step'));
+      else if (act === 'step-prev') setStep(state.step - 1);
+      else if (act === 'step-next') setStep(state.step + 1);
+      else if (act === 'reset') { setStatus(''); select(DEFAULT_V); }
+      if (act !== 'jump') return;
+    }
+    var c = e.target.closest('[data-value]');
+    if (c) select(+c.getAttribute('data-value'));
+  }
+
+  function onKey(e) {
+    var c = e.target.closest && e.target.closest('[data-value]');
+    if (!c) return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(+c.getAttribute('data-value')); return; }
+    var d = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+    if (!d || e.altKey) return;
+    e.preventDefault();
+    var view = c.closest('[data-view]'), r = +c.dataset.gr, col = +c.dataset.gc;
+    for (var i = 1; i <= 256; i++) {
+      var n = view.querySelector('[data-gr="' + (r + d[0] * i) + '"][data-gc="' + (col + d[1] * i) + '"]');
+      if (n) {
+        select(+n.getAttribute('data-value'));
+        var f = view.querySelector('[data-selected="true"]');
+        if (f) { f.focus({ preventScroll: true }); revealIn(f); }
+        return;
+      }
+    }
+  }
+
+  function onHover(e, on) {
+    var c = e.target.closest && e.target.closest('[data-value]');
+    if (!c) return;
+    document.querySelectorAll('[data-value="' + c.getAttribute('data-value') + '"]').forEach(function (x) { x.classList.toggle('hv', on); });
+  }
+
+  function init() {
+    initSortable();
+    selfCheck();
+    renderAll();
+    document.addEventListener('click', onClick);
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mouseover', function (e) { onHover(e, true); });
+    document.addEventListener('mouseout', function (e) { onHover(e, false); });
+    var inp = $('value-input');
+    inp.addEventListener('change', function () { jumpFromInput(inp.value); });
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') jumpFromInput(inp.value); });
+    syncHeader();
+    window.addEventListener('resize', syncHeader);
+    applySelection(true);
+  }
+  // the toolbar wraps to several lines on narrow screens; keep sticky offsets below it
+  function syncHeader() {
+    var h = document.querySelector('header.top');
+    if (h) document.documentElement.style.setProperty('--hdr', h.offsetHeight + 'px');
+  }
+
+  // ---------- section reorder: moves the four existing <section> nodes, never clones them ----------
+  var SORT_IDS = ['tmem-registers', 'fragments', 'smem-logical', 'smem-physical'];
+  var SORT_NAMES = { 'tmem-registers': '输入与寄存器', 'fragments': 'f：块 × 片段表', 'smem-logical': 'h：SMEM 逻辑矩阵', 'smem-physical': 'SMEM 物理字节' };
+  var ORDER_KEY = 'deepgemm.sm100-tmem-reg-smem-transpose.section-order.v1';
+  var DRAG_THRESHOLD = 5, sortRegion = null, drag = null, pendingScroll = [];
+
+  function validOrder(a) {
+    return Array.isArray(a) && a.length === SORT_IDS.length && SORT_IDS.every(function (id) { return a.indexOf(id) >= 0; });
+  }
+  function sameOrder(a, b) { return a.length === b.length && a.every(function (x, i) { return x === b[i]; }); }
+  function loadOrder() {
+    try {
+      var s = window.localStorage.getItem(ORDER_KEY);
+      if (s == null) return null;
+      var a = JSON.parse(s);
+      if (validOrder(a)) return a.slice();
+      window.localStorage.removeItem(ORDER_KEY);
+    } catch (e) { /* disabled / throwing / corrupt storage: use default */ }
+    return null;
+  }
+  function saveOrder(a) {
+    try {
+      if (sameOrder(a, SORT_IDS)) window.localStorage.removeItem(ORDER_KEY);
+      else window.localStorage.setItem(ORDER_KEY, JSON.stringify(a));
+    } catch (e) { /* ignore */ }
+  }
+  function sortSections() {
+    return Array.prototype.filter.call(sortRegion.children, function (e) { return e.tagName === 'SECTION' && SORT_IDS.indexOf(e.id) >= 0; });
+  }
+  function currentOrder() { return sortSections().map(function (e) { return e.id; }); }
+  function headerBottom() { var h = document.querySelector('header.top'); return h ? Math.max(0, h.getBoundingClientRect().bottom) : 0; }
+  function announce(msg) { $('sort-live').textContent = msg; }
+
+  function updateHandleLabels() {
+    sortSections().forEach(function (sec, i) {
+      var h = sec.querySelector(':scope > [data-sort-handle]');
+      if (h) h.setAttribute('aria-label', '调整「' + SORT_NAMES[sec.id] + '」的位置，当前第 ' + (i + 1) + '/' + SORT_IDS.length + ' 位；拖动或按 Alt+上/下方向键');
+    });
+  }
+
+  // Detaching a node resets the scroll offsets of its descendants; snapshot and restore them.
+  function snapshotScroll(sec) {
+    return Array.prototype.map.call(sec.querySelectorAll('.scroll'), function (el) { return [el, el.scrollTop, el.scrollLeft]; });
+  }
+  function restoreScroll(snap) {
+    snap.forEach(function (s) {
+      s[0].scrollTop = s[1]; s[0].scrollLeft = s[2];
+      // content inside a closed <details> is not laid out; retry when it is opened again
+      if ((s[1] && s[0].scrollTop !== s[1]) || (s[2] && s[0].scrollLeft !== s[2])) pendingScroll.push(s);
+    });
+  }
+  function onDetailsToggle(e) {
+    if (!e.target.open || !pendingScroll.length) return;
+    pendingScroll = pendingScroll.filter(function (s) {
+      if (!e.target.contains(s[0])) return true;
+      s[0].scrollTop = s[1]; s[0].scrollLeft = s[2];
+      return false;
+    });
+  }
+
+  // Reorders with the minimal number of insertBefore moves; keeps focus and inner scroll positions.
+  function applyOrder(order) {
+    if (!validOrder(order)) return false;
+    var active = document.activeElement;
+    order.forEach(function (id, i) {
+      var el = $(id), cur = sortSections();
+      if (cur[i] === el) return;
+      var snap = snapshotScroll(el);
+      sortRegion.insertBefore(el, cur[i]);
+      restoreScroll(snap);
+    });
+    if (active && active !== document.activeElement && document.contains(active)) active.focus({ preventScroll: true });
+    updateHandleLabels();
+    return true;
+  }
+
+  // Moves sec to index idx and scrolls so that sec's top lands at viewport y = anchorTop.
+  function moveSection(sec, idx, anchorTop) {
+    var order = currentOrder().filter(function (id) { return id !== sec.id; });
+    order.splice(idx, 0, sec.id);
+    if (sameOrder(order, currentOrder())) return false;
+    applyOrder(order);
+    saveOrder(order);
+    var minTop = headerBottom() + 8, want = Math.max(minTop, Math.min(anchorTop, window.innerHeight - 60));
+    window.scrollBy(0, sec.getBoundingClientRect().top - want);
+    announce('已将「' + SORT_NAMES[sec.id] + '」移到第 ' + (idx + 1) + '/' + SORT_IDS.length + ' 位');
+    return true;
+  }
+
+  function onHandleKey(e) {
+    var h = e.target.closest && e.target.closest('[data-sort-handle]');
+    if (!h || drag || !e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    var d = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+    if (!d) return;
+    e.preventDefault(); e.stopPropagation();
+    var sec = h.closest('section'), idx = currentOrder().indexOf(sec.id), to = idx + d;
+    if (to < 0 || to >= SORT_IDS.length) { announce('「' + SORT_NAMES[sec.id] + '」已在' + (d < 0 ? '最上' : '最下') + '方'); return; }
+    var top = sec.getBoundingClientRect().top;
+    moveSection(sec, to, top);
+    h.focus({ preventScroll: true });
+  }
+
+  // ---- pointer drag ----
+  function dragTarget() {
+    var others = sortSections().filter(function (e) { return e !== drag.sec; }), idx = 0;
+    others.forEach(function (e) { var r = e.getBoundingClientRect(); if (r.top + r.height / 2 < drag.y) idx++; });
+    return { idx: idx, others: others };
+  }
+  function updateDrag() {
+    var t = dragTarget(), ind = $('sort-indicator'), y;
+    drag.idx = t.idx;
+    if (t.idx < t.others.length) y = t.others[t.idx].offsetTop - 6;
+    else { var last = t.others[t.others.length - 1]; y = last.offsetTop + last.offsetHeight + 6; }
+    ind.style.top = y + 'px';
+    ind.classList.toggle('noop', currentOrder().indexOf(drag.sec.id) === t.idx);
+    drag.ghost.style.transform = 'translate(' + (drag.x + 14) + 'px,' + (drag.y + 12) + 'px)';
+  }
+  function edgeSpeed(y) {
+    var top = headerBottom(), zone = Math.max(40, Math.min(90, window.innerHeight * 0.12)), bot = window.innerHeight - zone, k = 0;
+    if (y < top + zone) k = -Math.min(1, (top + zone - y) / zone);
+    else if (y > bot) k = Math.min(1, (y - bot) / zone);
+    return k ? (k < 0 ? -1 : 1) * 1.6 * (0.15 + 0.85 * k * k) : 0; // px per ms
+  }
+  function dragTick(ts) {
+    if (!drag || !drag.active) return;
+    var dt = drag.t ? Math.min(50, ts - drag.t) : 16, v = edgeSpeed(drag.y);
+    drag.t = ts;
+    if (v) {
+      var before = window.scrollY;
+      window.scrollBy(0, v * dt);
+      if (window.scrollY !== before) updateDrag();
+    }
+    drag.raf = requestAnimationFrame(dragTick);
+  }
+  function startDrag() {
+    drag.active = true;
+    document.body.classList.add('sorting');
+    drag.sec.classList.add('sort-src');
+    var g = document.createElement('div');
+    g.className = 'sort-ghost'; g.setAttribute('aria-hidden', 'true');
+    g.textContent = '移动：' + SORT_NAMES[drag.sec.id];
+    document.body.appendChild(g);
+    drag.ghost = g;
+    $('sort-indicator').hidden = false;
+    updateDrag();
+    drag.raf = requestAnimationFrame(dragTick);
+  }
+  function endDrag(commit) {
+    var d = drag;
+    if (!d) return;
+    drag = null;
+    cancelAnimationFrame(d.raf);
+    window.removeEventListener('pointermove', onDragMove, true);
+    window.removeEventListener('pointerup', onDragUp, true);
+    window.removeEventListener('pointercancel', onDragCancel, true);
+    window.removeEventListener('lostpointercapture', onDragCancel, true);
+    window.removeEventListener('blur', onDragCancel);
+    document.removeEventListener('keydown', onDragKey, true);
+    document.removeEventListener('visibilitychange', onDragCancel);
+    try { if (d.handle.hasPointerCapture(d.id)) d.handle.releasePointerCapture(d.id); } catch (e) { /* ignore */ }
+    var ind = $('sort-indicator'), anchor = ind.getBoundingClientRect().top;
+    ind.hidden = true; ind.classList.remove('noop');
+    if (d.ghost && d.ghost.parentNode) d.ghost.parentNode.removeChild(d.ghost);
+    document.body.classList.remove('sorting');
+    d.sec.classList.remove('sort-src');
+    if (!d.active) return;
+    if (commit) {
+      if (!moveSection(d.sec, d.idx, anchor)) announce('顺序未改变');
+    } else {
+      window.scrollTo(window.scrollX, d.scroll0);
+      announce('已取消拖动，顺序未改变');
+    }
+    d.handle.focus({ preventScroll: true });
+  }
+  function onDragMove(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.x = e.clientX; drag.y = e.clientY;
+    if (!drag.active && Math.abs(drag.x - drag.x0) + Math.abs(drag.y - drag.y0) >= DRAG_THRESHOLD) startDrag();
+    if (drag.active) { e.preventDefault(); updateDrag(); }
+  }
+  function onDragUp(e) { if (drag && e.pointerId === drag.id) endDrag(true); }
+  function onDragCancel(e) {
+    if (!drag) return;
+    if (e && e.pointerId !== undefined && e.type !== 'blur' && e.pointerId !== drag.id) return;
+    if (e && e.type === 'visibilitychange' && !document.hidden) return;
+    endDrag(false);
+  }
+  function onDragKey(e) {
+    if (!drag) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endDrag(false); }
+    else if (drag.active) { e.preventDefault(); e.stopPropagation(); }
+  }
+  function onHandleDown(e) {
+    var h = e.target.closest && e.target.closest('[data-sort-handle]');
+    if (!h || drag || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    var sec = h.closest('section');
+    if (!sec || sec.parentNode !== sortRegion) return;
+    e.preventDefault(); // no text selection / native gestures from the handle
+    h.focus({ preventScroll: true });
+    drag = { handle: h, sec: sec, id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
+      active: false, idx: -1, raf: 0, t: 0, ghost: null, scroll0: window.scrollY };
+    try { h.setPointerCapture(e.pointerId); } catch (err) { /* window listeners still track the pointer */ }
+    window.addEventListener('pointermove', onDragMove, true);
+    window.addEventListener('pointerup', onDragUp, true);
+    window.addEventListener('pointercancel', onDragCancel, true);
+    window.addEventListener('lostpointercapture', onDragCancel, true);
+    window.addEventListener('blur', onDragCancel);
+    document.addEventListener('keydown', onDragKey, true);
+    document.addEventListener('visibilitychange', onDragCancel);
+  }
+
+  function initSortable() {
+    sortRegion = $('sort-region');
+    if (!sortRegion || !SORT_IDS.every(function (id) { var e = $(id); return e && e.parentNode === sortRegion; })) {
+      if ($('sort-bar')) $('sort-bar').hidden = true;
+      return;
+    }
+    var saved = loadOrder();
+    if (saved) applyOrder(saved); else updateHandleLabels();
+    sortRegion.addEventListener('pointerdown', onHandleDown);
+    sortRegion.addEventListener('keydown', onHandleKey);
+    sortRegion.addEventListener('toggle', onDetailsToggle, true);
+    sortRegion.addEventListener('dragstart', function (e) { if (e.target.closest && e.target.closest('[data-sort-handle]')) e.preventDefault(); });
+    $('sort-reset').addEventListener('click', function () {
+      if (sameOrder(currentOrder(), SORT_IDS)) { saveOrder(SORT_IDS); announce('已是默认顺序'); return; }
+      applyOrder(SORT_IDS); saveOrder(SORT_IDS);
+      announce('已恢复默认顺序');
+    });
+  }
+
+  window.transposeSectionOrder = {
+    storageKey: ORDER_KEY, ids: SORT_IDS.slice(),
+    get: function () { return sortRegion ? currentOrder() : SORT_IDS.slice(); },
+    set: function (order) { if (!sortRegion || !applyOrder(order)) return false; saveOrder(currentOrder()); return true; },
+    reset: function () { if (!sortRegion) return false; applyOrder(SORT_IDS); saveOrder(SORT_IDS); return true; }
+  };
+
+  window.transposeDemo = {
+    getState: getState, trace: trace, getAllTraces: getAllTraces, select: select, setMode: setMode, setStep: setStep,
+    setM: setM, getConfig: getConfig, selfCheck: selfCheck, mValues: M_VALUES.slice(),
+    phi: phi, steps: STEPS.map(function (s) { return s.id; })
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+</body>
+</html>
